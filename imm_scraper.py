@@ -4,6 +4,7 @@ import requests
 import lxml.html
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.support.ui import Select
 from time import sleep
 from random import randint
 import datetime
@@ -78,27 +79,15 @@ def scrape_details(driver):
     return ice_dict
 
 
-from selenium.webdriver.support.ui import Select
-
-
-def change_col_to_facilities(driver, col=1):
+def select_col_dropdown(driver, val="State", col=1):
     div = driver.find_element_by_id(f"col{col}head2")
     dropdown = Select(div.find_element_by_id("dimension_pick_col1"))
     options = dropdown.options
-    if options[3].text == "County-Facility Detainer Sent":
-        options[3].click()
-        sleep(0.5)
-    else:
-        pass
-
-
-def change_col_to_state(driver, col=1):
-    div = driver.find_element_by_id(f"col{col}head2")
-    dropdown = Select(div.find_element_by_id("dimension_pick_col1"))
-    options = dropdown.options
-    if options[2].text == "State":
-        options[2].click()
-        sleep(0.5)
+    opt_vals = [i.text for i in options]
+    if val in opt_vals:
+        options[opt_vals.index(val)].click()
+        print("Selected", val)
+        sleep(0.25)
     else:
         pass
 
