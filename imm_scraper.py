@@ -46,10 +46,8 @@ def startup():
     return driver
 
 
-# This identifies the current things that are clicked on and returns them as a dict
-
-
 def scrape_details(driver):
+    """This identifies the current things that are clicked on and returns them as a dict"""
     ice_dict = {}
     # Get state and jurisdiction selected by click in the table
     state_xpath = "//div[@id='col1']/table/tbody/tr[@class='rowsel']/td/a"
@@ -79,21 +77,8 @@ def scrape_details(driver):
     return ice_dict
 
 
-def select_col_dropdown(driver, val="State", col=1):
-    div = driver.find_element_by_id(f"col{col}head2")
-    dropdown = Select(div.find_element_by_id("dimension_pick_col1"))
-    options = dropdown.options
-    opt_vals = [i.text for i in options]
-    if val in opt_vals:
-        options[opt_vals.index(val)].click()
-        print("Selected", val)
-        sleep(0.25)
-    else:
-        pass
-
-
-# Gets the scraped info calling prior function for each jurisdiction, and returns df
 def get_jurisdictions(driver):
+    """Gets the scraped info calling prior function for each jurisdiction, and returns df"""
     df = pd.DataFrame(
         columns=["State", "Jurisdiction", "All", "Yes", "No", "County", "Facility"]
     )
@@ -117,11 +102,9 @@ def get_jurisdictions(driver):
     return df
 
 
-all_jur_xpath = '//*[@id="col1"]/table/tbody/tr[1]/td/a'  # want to exclude this
-
-all_state_xpath_template = '//*[@id="col1"]/table/tbody/tr[{}]/td/a'
-
-if __name__ == "__main__":
+def old_main(driver):
+    all_jur_xpath = '//*[@id="col1"]/table/tbody/tr[1]/td/a'  # want to exclude this
+    all_state_xpath_template = '//*[@id="col1"]/table/tbody/tr[{}]/td/a'
     # Run the script
     full_nation_df = pd.DataFrame(
         columns=["State", "Jurisdiction", "All", "Yes", "No", "County", "Facility"]
@@ -148,3 +131,119 @@ if __name__ == "__main__":
     datestring = get_year_date()
     full_nation_df.to_csv("./data/ice_detainees_{}.csv".format(datestring), index=False)
     driver.quit()
+
+
+def select_col_dropdown(driver, val="State", col=1):
+    div = driver.find_element_by_id(f"col{col}head2")
+    dropdown = Select(div.find_element_by_id("dimension_pick_col1"))
+    options = dropdown.options
+    opt_vals = [i.text for i in options]
+    if val in opt_vals:
+        options[opt_vals.index(val)].click()
+        print("Selected", val)
+    else:
+        pass
+
+
+def capture_header(driver, col=1):
+    header = div.find_element_by_tag_name("thead")
+    # all these headers are the col name and " Total" so parse that total
+    hed_text_list = [header.text[: header.text.index(" Total")], "Total"]
+    return hed_text_list
+
+
+def capture_items_in_table(driver, col=1):
+    div = driver.find_element_by_id(f"col{col}")
+
+    # drop all the key/vals into a dict
+    rows = div.find_element_by_tag_name("tbody").find_elements_by_tag_name("tr")
+    tb = list()
+    for r in rows:
+        vals = r.find_elements_by_tag_name("td")
+        key, val = [i.text for i in vals]
+        # val = r.find_element_by_tag_name("td").text
+        # val = r.find_element_by_class_name("Data r").text
+        # tb[key] = val
+        tb.append((key, val))
+
+    return tb
+
+
+def click_each_selection_in_table(driver, col=1):
+    div = driver.find_element_by_id(f"col{col}")
+
+
+def new_main(driver, DEBUG=False):
+    # first get the county-facility numbers for every state
+    select_col_dropdown(driver, val="State", col=1)
+    sleep(0.5)
+    select_col_dropdown(driver, val="County-Facility Detainer Sent", col=2)
+    sleep(0.5)
+    select_col_dropdown(driver, val="Month and Year", col=3)
+    sleep(0.5)
+    state_totals = capture_items_in_table(driver, col=1)
+    cf_vals = capture_items_in_table(driver, col=2)
+    state_total_df = pd.DataFrame.from_records(state_totals, columns=["State", "Total"])
+    cf_total_df = pd.DataFrame.from_records(
+        cf_vals, columns=["County-Facility Detainer Sent", "Total"]
+    )
+
+    # recall we changed the dropdown to state above
+    all_states = (
+        driver.find_element_by_id("col1")
+        .find_element_by_tag_name("tbody")
+        .find_elements_by_tag_name("tr")
+    )
+
+    if DEBUG:
+        all_states = all_states[-3:]
+
+    records = []
+
+    for state in reversed(all_states):
+        state_text = " ".join(state.text.split()[:-1])
+        print(state_text)
+        state.find_element_by_tag_name("a").click()
+        sleep(0.5)
+        date_pairs = capture_items_in_table(driver, col=3)
+        facilities_in_state = (
+            driver.find_element_by_id("col2")
+            .find_element_by_tag_name("tbody")
+            .find_elements_by_tag_name("tr")
+        )
+        for facility in facilities_in_state:
+            facility_text = " ".join(facility.text.split()[:-1])
+            print(facility_text)
+            facility.find_element_by_tag_name("a").click()
+            sleep(2)
+            facility_date_pairs = capture_items_in_table(driver, col=3)
+            for z in facility_date_pairs:
+                x, y = z
+                records.append((state_text, facility_text, x, y))
+        if not DEBUG:
+            state_df = pd.DataFrame.from_records(
+                records, columns="State,Facility,Year-Month,Total".split(",")
+            )
+            state_df.to_csv(f"data/state_total_{state_text}.csv")
+            print(f"Wrote {len(state_df)} records for {state_text}")
+    tot_df = pd.DataFrame.from_records(
+        records, columns="State,Facility,Year-Month,Total".split(",")
+    )
+    print(tot_df.shape)
+    print(tot_df.head())
+    if not DEBUG:
+        state_total_df.to_csv("data/state_totals.csv", headers=False)
+        tot_df.to_csv("data/total_county_facility_date.csv", headers=False)
+
+    pass
+
+
+if __name__ == "__main__":
+    driver = startup()
+
+    # old_main()
+
+    # get all the county-facility numbers for each month-year
+    new_main(driver, DEBUG=False)
+
+    driver.close()
