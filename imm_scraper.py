@@ -9,28 +9,6 @@ from time import sleep
 from random import randint
 import datetime
 
-"""
-class ImmScraper():
-    def __init__(self):
-        self.url_to_scrape = "http://trac.syr.edu/phptools/immigration/detain/"
-        self.page_items=[]
-        self.all_items=[]
-    # headless driver
-    def start_driver(self):
-        print('starting driver...')
-        self.driver = webdriver.Firefox()
-    def close_driver(self):
-        print('closing driver...')
-        self.driver.quit()
-        self('closed!')
-    def get_page(self,url):
-        def get_page(self,url):
-            print('getting page...')
-            self.driver.get(url)
-            sleep(randint(.5,1))
-    def click_page
-"""
-
 
 def startup():
     url = "http://trac.syr.edu/phptools/immigration/detain/"
@@ -173,7 +151,8 @@ def click_each_selection_in_table(driver, col=1):
     div = driver.find_element_by_id(f"col{col}")
 
 
-def new_main(driver, DEBUG=False):
+def get_totals_all_states(driver, DEBUG=False):
+    t0 = datetime.datetime.now()
     # first get the county-facility numbers for every state
     select_col_dropdown(driver, val="State", col=1)
     sleep(0.5)
@@ -200,11 +179,11 @@ def new_main(driver, DEBUG=False):
 
     records = []
 
-    for state in reversed(all_states):
+    for state in all_states[1:6]:
         state_text = " ".join(state.text.split()[:-1])
         print(state_text)
         state.find_element_by_tag_name("a").click()
-        sleep(0.5)
+        sleep(2)
         date_pairs = capture_items_in_table(driver, col=3)
         facilities_in_state = (
             driver.find_element_by_id("col2")
@@ -225,7 +204,10 @@ def new_main(driver, DEBUG=False):
                 records, columns="State,Facility,Year-Month,Total".split(",")
             )
             state_df.to_csv(f"data/state_total_{state_text}.csv")
-            print(f"Wrote {len(state_df)} records for {state_text}")
+            timeval = datetime.datetime.now() - t0
+            print(
+                f"Wrote {len(state_df)} records for {state_text} in {timeval.seconds//60} total minutes"
+            )
     tot_df = pd.DataFrame.from_records(
         records, columns="State,Facility,Year-Month,Total".split(",")
     )
@@ -238,12 +220,37 @@ def new_main(driver, DEBUG=False):
     pass
 
 
+def remove_all(l):
+    """removes any entry from a list of tuples that includes "All"
+    Intended to be used with a filter function"""
+    for x in l:
+        if "All" in x:
+            return False
+        else:
+            return True
+
+
+def get_details_for_facility_date(driver):
+    """Get all the dropdown details for a single facility-date comparison."""
+    # first get the county-facility numbers for every state
+    select_col_dropdown(driver, val="County-Facility Detainer Sent", col=1)
+    sleep(2)
+    select_col_dropdown(driver, val="Month and Year", col=2)
+    sleep(2)
+    d = dict()
+    for entry in ["Gender", "Facility Type", "Detainer Refused"]:
+        select_col_dropdown(driver, val=entry, col=3)
+        tups = capture_items_in_table(driver, col=3)
+        d[entry] = list(filter(remove_all, tups))
+    return d
+
+
 if __name__ == "__main__":
     driver = startup()
 
     # old_main()
 
     # get all the county-facility numbers for each month-year
-    new_main(driver, DEBUG=False)
+    get_totals_all_states(driver, DEBUG=False)
 
     driver.close()
