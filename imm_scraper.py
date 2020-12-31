@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import Select
 from time import sleep
 from random import randint
 import datetime
+import warnings
 
 
 def startup():
@@ -111,14 +112,15 @@ def old_main(driver):
     driver.quit()
 
 
-def select_col_dropdown(driver, val="State", col=1):
+def select_col_dropdown(driver, val="State", col=1, verbose=False):
     div = driver.find_element_by_id(f"col{col}head2")
     dropdown = Select(div.find_element_by_id("dimension_pick_col1"))
     options = dropdown.options
     opt_vals = [i.text for i in options]
     if val in opt_vals:
         options[opt_vals.index(val)].click()
-        print("Selected", val)
+        if verbose:
+            print("Selected", val)
     else:
         pass
 
@@ -230,19 +232,133 @@ def remove_all(l):
             return True
 
 
-def get_details_for_facility_date(driver):
-    """Get all the dropdown details for a single facility-date comparison."""
-    # first get the county-facility numbers for every state
+def make_selection_in_col(driver, selection, col=1):
+    div = driver.find_element_by_id(f"col{col}")
+    div.find_element_by_link_text(selection).click()
+    sleep(0.1)
+
+
+def set_up_facility_date(driver):
     select_col_dropdown(driver, val="County-Facility Detainer Sent", col=1)
     sleep(2)
+
     select_col_dropdown(driver, val="Month and Year", col=2)
     sleep(2)
+
+
+def get_details_for_facility_date(driver):
+    """Get all the dropdown details for a single facility-date comparison."""
     d = dict()
-    for entry in ["Gender", "Facility Type", "Detainer Refused"]:
+    for entry in [
+        "County-Facility Detainer Sent",
+        "Month and Year",
+        "Fiscal Year",
+        "State",
+        "Facility Type",
+        "ICE Assumed Custody After Detainer Issued",
+        "Notice (Not Detainer) Issued",
+        "Detainer Refused",
+        "Most Serious Criminal Conviction (MSCC)",
+        "Seriousness Level of MSCC Conviction",
+        "Criminal History",
+        "Age Group",
+        "Citizenship",
+        "Gender",
+    ]:
         select_col_dropdown(driver, val=entry, col=3)
         tups = capture_items_in_table(driver, col=3)
         d[entry] = list(filter(remove_all, tups))
+        sleep(0.5)
     return d
+
+
+def get_all_options_in_column(driver, col=1):
+    div = driver.find_element_by_id(f"col{col}")
+    table = div.find_element_by_tag_name("tbody")
+    full_list = [
+        i.find_element_by_tag_name("a").text
+        for i in table.find_elements_by_tag_name("tr")
+    ]
+    return list(filter(lambda x: x != "All", full_list))
+
+
+def check_total(num, ref, *args):
+    """Check that the number is the same as the reference.
+    If it's not, print something to that effect.
+    """
+    if int(ref.replace(",", "")) != int(num.replace(",", "")):
+        warnings.warn(f"{args}The current value {num} should be {ref}")
+        return False
+    else:
+        return True
+
+
+def convert_data_to_tups(d):
+    data = d.copy()
+    facility, facility_total = data["County-Facility Detainer Sent"][0]
+    kv_tups = [("Total Detainers", facility_total)]
+    gender = data.get("Gender", [])
+    data.pop("Gender")
+    citizenship = data.get("Citizenship", [])
+    data.pop("Citizenship")
+    date = data.get("Month and Year")
+
+    categorical_vars = [
+        "County-Facility Detainer Sent",
+        "Fiscal Year",
+        "Month and Year",
+        "State",
+        "Facility Type",
+    ]
+
+    for i in categorical_vars:
+        data[i] = data[i][0]
+        if check_total(data[i][1], facility_total, facility, i):
+            kv_tups.append((i, data[i][0]))
+            data.pop(i)
+        else:
+            f = open("weird_jurisdictions.txt", "a")
+            f.write(f"{facility};{i};{date}\n")
+            f.close()
+            data.pop(i)
+            continue
+
+    for i in data.keys():
+        for a in data[i]:
+            entry, val = a
+            concat_name = "-".join([i, entry])
+            kv_tups.append((concat_name, val))
+    for i in gender:
+        kv_tups.append(i)
+    for i in citizenship:
+        kv_tups.append(i)
+
+    return kv_tups
+
+
+def create_df(driver):
+    set_up_facility_date(driver)
+    all_facilities_to_parse = get_all_options_in_column(driver, col=1)
+    df = pd.DataFrame()
+    for facility in sorted(all_facilities_to_parse)[12:]:
+        make_selection_in_col(driver, facility, col=1)
+        sleep(1)
+        all_dates_to_parse = get_all_options_in_column(driver, col=2)
+        for date in sorted(all_dates_to_parse, reverse=True)[:3]:
+            make_selection_in_col(driver, date, col=2)
+            sleep(2)
+            d = get_details_for_facility_date(driver)
+            ind, lst = list(zip(*convert_data_to_tups(d)))
+            row = pd.DataFrame(pd.Series(lst, index=ind))
+            df = pd.concat([df, row], axis=1).fillna(0)
+            make_selection_in_col(driver, facility, col=1)
+        print(f"Completed {facility} - {len(df.T)} total rows")
+        df.T.to_csv("data/total_data.csv", index=False)
+
+        if len(df) > 50:
+            df.T.to_csv("data/total_data.csv", index=False)
+        sleep(0.1)
+        set_up_facility_date(driver)
 
 
 if __name__ == "__main__":
@@ -251,6 +367,6 @@ if __name__ == "__main__":
     # old_main()
 
     # get all the county-facility numbers for each month-year
-    get_totals_all_states(driver, DEBUG=False)
+    create_df(driver)
 
     driver.close()
