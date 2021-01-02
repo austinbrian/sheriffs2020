@@ -226,7 +226,7 @@ def remove_all(l):
     """removes any entry from a list of tuples that includes "All"
     Intended to be used with a filter function"""
     for x in l:
-        if "All" in x:
+        if x == "All":
             return False
         else:
             return True
@@ -260,9 +260,9 @@ def get_details_for_facility_date(driver):
     """Get all the dropdown details for a single facility-date comparison."""
     d = dict()
     for entry in [
-        "County-Facility Detainer Sent",
         # "Month and Year",
         "Fiscal Year",
+        "County-Facility Detainer Sent",
         "State",
         "Facility Type",
         "ICE Assumed Custody After Detainer Issued",
@@ -276,6 +276,7 @@ def get_details_for_facility_date(driver):
         "Gender",
     ]:
         select_col_dropdown(driver, val=entry, col=3)
+        sleep(1)
         tups = capture_items_in_table(driver, col=3)
         d[entry] = list(filter(remove_all, tups))
         sleep(0.5)
@@ -305,7 +306,11 @@ def check_total(num, ref, *args):
 
 def convert_data_to_tups(d):
     data = d.copy()
-    facility, facility_total = data["County-Facility Detainer Sent"][0]
+    try:
+        facility, facility_total = data["County-Facility Detainer Sent"]
+    except Exception as e:
+        print(e)
+        print(data)
     kv_tups = [("Total Detainers", facility_total)]
     gender = data.get("Gender", [])
     data.pop("Gender")
@@ -353,8 +358,13 @@ def create_df(driver):
     all_facilities_to_parse = get_all_options_in_column(driver, col=1)[
         10:
     ]  # completed through Adair
+    df = pd.DataFrame(pd.read_csv("data/total_yearly_data.csv"))
+    number_currently_in_file = df["County-Facility Detainer Sent"].nunique()
+    facilities_already_scraped = df["County-Facility Detainer Sent"].unique()
+    all_facilities_to_parse = list(
+        filter(lambda x: x not in facilities_already_scraped, all_facilities_to_parse)
+    )
     print(f"This session will parse {len(all_facilities_to_parse)} facilities")
-    df = pd.DataFrame()
     for facility in sorted(all_facilities_to_parse):
         make_selection_in_col(driver, facility, col=1)
         sleep(1)
@@ -362,13 +372,17 @@ def create_df(driver):
 
         # Limit to the 48 most recent months for which there is data
         for date in sorted(all_dates_to_parse, reverse=True)[:48]:
-            make_selection_in_col(driver, date, col=2)
-            sleep(1)
-            d = get_details_for_facility_date(driver)
-            ind, lst = list(zip(*convert_data_to_tups(d)))
-            row = pd.DataFrame(pd.Series(lst, index=ind))
-            df = pd.concat([df, row.T], axis=0).fillna(0)
-            make_selection_in_col(driver, facility, col=1)
+            try:
+                make_selection_in_col(driver, date, col=2)
+                sleep(0.5)
+                d = get_details_for_facility_date(driver)
+                ind, lst = list(zip(*convert_data_to_tups(d)))
+                row = pd.DataFrame(pd.Series(lst, index=ind))
+                df = pd.concat([df, row.T], axis=0).fillna(0)
+                make_selection_in_col(driver, facility, col=1)
+            except Exception as e:
+                print(e, "--", facility, date)
+                continue
         # df.to_csv("data/total_data.csv", index=False)
         df.to_csv("data/total_yearly_data.csv", index=False)
         rowtotal = len(df)
