@@ -233,7 +233,9 @@ def remove_all(l):
 
 
 def make_selection_in_col(driver, selection, col=1):
+    sleep(0.2)
     div = driver.find_element_by_id(f"col{col}")
+    sleep(0.2)
     div.find_element_by_link_text(selection).click()
     sleep(0.1)
 
@@ -246,12 +248,20 @@ def set_up_facility_date(driver):
     sleep(2)
 
 
+def set_up_facility_year(driver):
+    select_col_dropdown(driver, val="County-Facility Detainer Sent", col=1)
+    sleep(2)
+
+    select_col_dropdown(driver, val="Fiscal Year", col=2)
+    sleep(2)
+
+
 def get_details_for_facility_date(driver):
     """Get all the dropdown details for a single facility-date comparison."""
     d = dict()
     for entry in [
         "County-Facility Detainer Sent",
-        "Month and Year",
+        # "Month and Year",
         "Fiscal Year",
         "State",
         "Facility Type",
@@ -301,12 +311,12 @@ def convert_data_to_tups(d):
     data.pop("Gender")
     citizenship = data.get("Citizenship", [])
     data.pop("Citizenship")
-    date = data.get("Month and Year")
+    date = data.get("Month and Year", data.get("Fiscal Year", []))
 
     categorical_vars = [
         "County-Facility Detainer Sent",
         "Fiscal Year",
-        "Month and Year",
+        # "Month and Year",
         "State",
         "Facility Type",
     ]
@@ -317,7 +327,7 @@ def convert_data_to_tups(d):
             kv_tups.append((i, data[i][0]))
             data.pop(i)
         else:
-            f = open("weird_jurisdictions.txt", "a")
+            f = open("data/weird_jurisdictions.txt", "a")
             f.write(f"{facility};{i};{date}\n")
             f.close()
             data.pop(i)
@@ -337,28 +347,41 @@ def convert_data_to_tups(d):
 
 
 def create_df(driver):
-    set_up_facility_date(driver)
-    all_facilities_to_parse = get_all_options_in_column(driver, col=1)
+    # set_up_facility_date(driver)
+    set_up_facility_year(driver)
+    t0 = datetime.datetime.now()
+    all_facilities_to_parse = get_all_options_in_column(driver, col=1)[
+        10:
+    ]  # completed through Adair
+    print(f"This session will parse {len(all_facilities_to_parse)} facilities")
     df = pd.DataFrame()
-    for facility in sorted(all_facilities_to_parse)[12:]:
+    for facility in sorted(all_facilities_to_parse):
         make_selection_in_col(driver, facility, col=1)
         sleep(1)
         all_dates_to_parse = get_all_options_in_column(driver, col=2)
-        for date in sorted(all_dates_to_parse, reverse=True)[:3]:
+
+        # Limit to the 48 most recent months for which there is data
+        for date in sorted(all_dates_to_parse, reverse=True)[:48]:
             make_selection_in_col(driver, date, col=2)
-            sleep(2)
+            sleep(1)
             d = get_details_for_facility_date(driver)
             ind, lst = list(zip(*convert_data_to_tups(d)))
             row = pd.DataFrame(pd.Series(lst, index=ind))
-            df = pd.concat([df, row], axis=1).fillna(0)
+            df = pd.concat([df, row.T], axis=0).fillna(0)
             make_selection_in_col(driver, facility, col=1)
-        print(f"Completed {facility} - {len(df.T)} total rows")
-        df.T.to_csv("data/total_data.csv", index=False)
+        # df.to_csv("data/total_data.csv", index=False)
+        df.to_csv("data/total_yearly_data.csv", index=False)
+        rowtotal = len(df)
 
-        if len(df) > 50:
-            df.T.to_csv("data/total_data.csv", index=False)
+        t1 = datetime.datetime.now()
+        tval = t1 - t0
+        print(
+            f"Completed {facility} - {len(df)} total rows in {tval.seconds//60} minutes"
+        )
+
         sleep(0.1)
-        set_up_facility_date(driver)
+        set_up_facility_year(driver)
+        t0 = datetime.datetime.now()
 
 
 if __name__ == "__main__":
