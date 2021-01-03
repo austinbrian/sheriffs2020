@@ -63,7 +63,7 @@ def get_jurisdictions(driver):
     )
     success_counter = 0
     failure_counter = 0
-    sleep(5)
+    # sleep(5)
     for i in driver.find_elements_by_xpath("//div[@id='col2']/table/tbody/tr/td/a"):
         i.click()  # click on it
         sleep(0.5)  # just to make sure the page gets a chance to load
@@ -233,7 +233,6 @@ def remove_all(l):
 
 
 def make_selection_in_col(driver, selection, col=1):
-    sleep(0.2)
     div = driver.find_element_by_id(f"col{col}")
     sleep(0.2)
     div.find_element_by_link_text(selection).click()
@@ -242,18 +241,18 @@ def make_selection_in_col(driver, selection, col=1):
 
 def set_up_facility_date(driver):
     select_col_dropdown(driver, val="County-Facility Detainer Sent", col=1)
-    sleep(2)
+    sleep(1)
 
     select_col_dropdown(driver, val="Month and Year", col=2)
-    sleep(2)
+    sleep(1)
 
 
 def set_up_facility_year(driver):
     select_col_dropdown(driver, val="County-Facility Detainer Sent", col=1)
-    sleep(2)
+    sleep(1)
 
     select_col_dropdown(driver, val="Fiscal Year", col=2)
-    sleep(2)
+    sleep(1)
 
 
 def get_details_for_facility_date(driver):
@@ -276,10 +275,10 @@ def get_details_for_facility_date(driver):
         "Gender",
     ]:
         select_col_dropdown(driver, val=entry, col=3)
-        sleep(1)
+        sleep(0.2)
         tups = capture_items_in_table(driver, col=3)
         d[entry] = list(filter(remove_all, tups))
-        sleep(0.5)
+        sleep(0.2)
     return d
 
 
@@ -307,7 +306,7 @@ def check_total(num, ref, *args):
 def convert_data_to_tups(d):
     data = d.copy()
     try:
-        facility, facility_total = data["County-Facility Detainer Sent"]
+        facility, facility_total = data["County-Facility Detainer Sent"][0]
     except Exception as e:
         print(e)
         print(data)
@@ -367,14 +366,14 @@ def create_df(driver):
     print(f"This session will parse {len(all_facilities_to_parse)} facilities")
     for facility in sorted(all_facilities_to_parse):
         make_selection_in_col(driver, facility, col=1)
-        sleep(1)
+        sleep(0.2)
         all_dates_to_parse = get_all_options_in_column(driver, col=2)
 
-        # Limit to the 48 most recent months for which there is data
-        for date in sorted(all_dates_to_parse, reverse=True)[:48]:
+        # Limit to the 48 most recent months for which there is data, or 8 years
+        for date in sorted(all_dates_to_parse, reverse=True)[:8]:
             try:
                 make_selection_in_col(driver, date, col=2)
-                sleep(0.5)
+                sleep(0.2)
                 d = get_details_for_facility_date(driver)
                 ind, lst = list(zip(*convert_data_to_tups(d)))
                 row = pd.DataFrame(pd.Series(lst, index=ind))
