@@ -18,7 +18,7 @@ def startup():
 
     driver = webdriver.Firefox(executable_path="/usr/local/bin/geckodriver")
     driver.get(url)
-    print(driver.title)
+    # print(driver.title)
     html = driver.page_source
     html = BeautifulSoup(html, "lxml")
     # sleep(6)
@@ -350,21 +350,94 @@ def convert_data_to_tups(d):
     return kv_tups
 
 
+def get_2021_counties():
+    """Source:"""
+    kansas = ["Wyandotte"]
+    louisiana = ["Orleans"]
+    ny = "Chenango, Cattaraugus, Chemung, Columbia, Erie, Livingston, Madison, Monroe, Putnam, Saratoga, Schenectady, Schoharie, Schuyler, Suffolk, Wayne, Wyoming".split(
+        ", "
+    )
+    nj = "Bergen, Camden, Essex, Gloucester, Salem".split(", ")
+    penn = "Adams, Allegheny, Armstrong, Blair, Bucks, Butler, Cambria, Cameron, Clarion, Clearfield, Columbia, Cumberland, Delaware, Erie, Forest, Greene, Huntingdon, Juniata, Lackawanna, Lawrence, Lebanon, Lycoming, McKean, Mifflin, Perry, Pike, Schuykill, Susquehanna, Tioga, Union, Venango, Washington".split(
+        ", "
+    )
+    # Each of 38 independent cities elect a sheriff on their gubernatorial cycle (the year after the presidential election: 2017, and so on).
+    virginia = ["city"]
+
+    state_county_dict = dict(
+        zip(
+            [
+                "Kansas",
+                "Louisiana",
+                "New York",
+                "New Jersey",
+                "Pennsylvania",
+                "Virginia",
+            ],
+            [kansas, louisiana, ny, nj, penn, virginia],
+        )
+    )
+    return state_county_dict
+
+
+def get_facilities_in_state_county(driver, state, county):
+
+    # select each state and get the corresponding set of county-facility detainers
+    select_col_dropdown(driver, "State", col=1)
+    sleep(0.2)
+    select_col_dropdown(driver, "County-Facility Detainer Sent", col=2)
+    sleep(2)
+    make_selection_in_col(driver, state, col=1)
+    all_facility_names = get_all_options_in_column(driver, col=2)
+
+    return [i for i in all_facility_names if county.lower() in i.lower()]
+
+
+def get_facilities_in_listed_counties(driver, state, *counties):
+    # select each state and get the corresponding set of county-facility detainers
+    select_col_dropdown(driver, "State", col=1)
+    sleep(0.2)
+    select_col_dropdown(driver, "County-Facility Detainer Sent", col=2)
+    sleep(1)
+    make_selection_in_col(driver, state, col=1)
+    sleep(1)
+    all_facility_names = get_all_options_in_column(driver, col=2)
+    if not counties:
+        counties = get_2021_counties()[state]
+    list_to_send = []
+    for c in counties:
+        for f in all_facility_names:
+            if c.lower() in f.lower():
+                list_to_send.append(f)
+
+    return list_to_send
+
+
 def create_df(driver):
-    # set_up_facility_date(driver)
-    set_up_facility_year(driver)
+    set_up_facility_date(driver)
     t0 = datetime.datetime.now()
-    all_facilities_to_parse = get_all_options_in_column(driver, col=1)[
-        10:
-    ]  # completed through Adair
+    all_facilities_to_parse = get_all_options_in_column(driver, col=1)
+    # Add in 2021 elections to parse those first
+    virginia = get_facilities_in_state_county(driver, "Virginia", "city")
+    ny = get_facilities_in_listed_counties(driver, "New York")
+    nj = get_facilities_in_listed_counties(driver, "New Jersey")
+    ks = get_facilities_in_listed_counties(driver, "Kansas")
+    lou = get_facilities_in_listed_counties(driver, "Louisiana")
+    penn = get_facilities_in_listed_counties(driver, "Pennsylvania")
+
+    all_facilities_to_parse = (
+        virginia + ks + ny + nj + lou + penn + sorted(all_facilities_to_parse)
+    )
+
     df = pd.DataFrame(pd.read_csv("data/total_yearly_data.csv"))
     number_currently_in_file = df["County-Facility Detainer Sent"].nunique()
     facilities_already_scraped = df["County-Facility Detainer Sent"].unique()
     all_facilities_to_parse = list(
         filter(lambda x: x not in facilities_already_scraped, all_facilities_to_parse)
     )
+    set_up_facility_year(driver)
     print(f"This session will parse {len(all_facilities_to_parse)} facilities")
-    for facility in sorted(all_facilities_to_parse):
+    for facility in all_facilities_to_parse:
         make_selection_in_col(driver, facility, col=1)
         sleep(0.2)
         all_dates_to_parse = get_all_options_in_column(driver, col=2)
@@ -392,7 +465,11 @@ def create_df(driver):
             f"Completed {facility} - {len(df)} total rows in {tval.seconds//60} minutes"
         )
 
-        sleep(0.1)
+        if len(df) % 10 == 0:
+            driver.close()
+
+            sleep(0.1)
+            driver = startup()
         set_up_facility_year(driver)
         t0 = datetime.datetime.now()
 
