@@ -362,7 +362,46 @@ def get_2021_counties():
         ", "
     )
     # Each of 38 independent cities elect a sheriff on their gubernatorial cycle (the year after the presidential election: 2017, and so on).
-    virginia = ['Alexandria city', 'Bristol city', 'Buena Vista city', 'Charlottesville city', 'Chesapeake city', 'Colonial Heights city', 'Covington city', 'Danville city', 'Emporia city', 'Fairfax city', 'Falls Church city', 'Franklin city', 'Fredericksburg city', 'Galax city', 'Hampton city', 'Harrisonburg city', 'Hopewell city', 'Lexington city', 'Lynchburg city', 'Manassas city', 'Manassas Park city', 'Martinsville city', 'Newport News city', 'Norfolk city', 'Norton city', 'Petersburg city', 'Poquoson city', 'Portsmouth city', 'Radford city', 'Richmond city', 'Roanoke city', 'Salem city', 'Staunton city', 'Suffolk city', 'Virginia Beach city', 'Waynesboro city', 'Williamsburg city', 'Winchester city']
+    virginia = [
+        "Alexandria city",
+        "Bristol city",
+        "Buena Vista city",
+        "Charlottesville city",
+        "Chesapeake city",
+        "Colonial Heights city",
+        "Covington city",
+        "Danville city",
+        "Emporia city",
+        "Fairfax city",
+        "Falls Church city",
+        "Franklin city",
+        "Fredericksburg city",
+        "Galax city",
+        "Hampton city",
+        "Harrisonburg city",
+        "Hopewell city",
+        "Lexington city",
+        "Lynchburg city",
+        "Manassas city",
+        "Manassas Park city",
+        "Martinsville city",
+        "Newport News city",
+        "Norfolk city",
+        "Norton city",
+        "Petersburg city",
+        "Poquoson city",
+        "Portsmouth city",
+        "Radford city",
+        "Richmond city",
+        "Roanoke city",
+        "Salem city",
+        "Staunton city",
+        "Suffolk city",
+        "Virginia Beach city",
+        "Waynesboro city",
+        "Williamsburg city",
+        "Winchester city",
+    ]
 
     state_county_dict = dict(
         zip(
