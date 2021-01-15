@@ -11,8 +11,8 @@ import datetime
 import warnings
 
 
-def startup():
-    url = "http://trac.syr.edu/phptools/immigration/detain/"
+def startup(reason="detain"):
+    url = f"http://trac.syr.edu/phptools/immigration/{reason}/"
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")  # , from_encoding="utf-8")
 
@@ -358,11 +358,11 @@ def get_2021_counties():
         ", "
     )
     nj = "Bergen, Camden, Essex, Gloucester, Salem".split(", ")
-    penn = "Adams, Allegheny, Armstrong, Blair, Bucks, Butler, Cambria, Cameron, Clarion, Clearfield, Columbia, Cumberland, Delaware, Erie, Forest, Greene, Huntingdon, Juniata, Lackawanna, Lawrence, Lebanon, Lycoming, McKean, Mifflin, Perry, Pike, Schuykill, Susquehanna, Tioga, Union, Venango, Washington".split(
+    penn = "Adams, Allegheny, Armstrong, Blair, Bucks, Butler, Cambria, Cameron, Clarion, Clearfield, Columbia, Cumberland, Delaware, Erie, Forest, Greene, Huntingdon, Juniata, Lackawanna, Lawrence, Lebanon, Lycoming, McKean, Mifflin, Perry, Pike, Schuylkill, Susquehanna, Tioga, Union, Venango, Washington".split(
         ", "
     )
     # Each of 38 independent cities elect a sheriff on their gubernatorial cycle (the year after the presidential election: 2017, and so on).
-    virginia = ["city"]
+    virginia = ['Alexandria city', 'Bristol city', 'Buena Vista city', 'Charlottesville city', 'Chesapeake city', 'Colonial Heights city', 'Covington city', 'Danville city', 'Emporia city', 'Fairfax city', 'Falls Church city', 'Franklin city', 'Fredericksburg city', 'Galax city', 'Hampton city', 'Harrisonburg city', 'Hopewell city', 'Lexington city', 'Lynchburg city', 'Manassas city', 'Manassas Park city', 'Martinsville city', 'Newport News city', 'Norfolk city', 'Norton city', 'Petersburg city', 'Poquoson city', 'Portsmouth city', 'Radford city', 'Richmond city', 'Roanoke city', 'Salem city', 'Staunton city', 'Suffolk city', 'Virginia Beach city', 'Waynesboro city', 'Williamsburg city', 'Winchester city']
 
     state_county_dict = dict(
         zip(
@@ -413,21 +413,21 @@ def get_facilities_in_listed_counties(driver, state, *counties):
     return list_to_send
 
 
-def create_df(driver):
+def scrape_detainers(driver):
     set_up_facility_date(driver)
     t0 = datetime.datetime.now()
     all_facilities_to_parse = get_all_options_in_column(driver, col=1)
     # Add in 2021 elections to parse those first
-    virginia = get_facilities_in_state_county(driver, "Virginia", "city")
-    ny = get_facilities_in_listed_counties(driver, "New York")
-    nj = get_facilities_in_listed_counties(driver, "New Jersey")
-    ks = get_facilities_in_listed_counties(driver, "Kansas")
-    lou = get_facilities_in_listed_counties(driver, "Louisiana")
-    penn = get_facilities_in_listed_counties(driver, "Pennsylvania")
+    # virginia = get_facilities_in_state_county(driver, "Virginia", "city")
+    # ny = get_facilities_in_listed_counties(driver, "New York")
+    # nj = get_facilities_in_listed_counties(driver, "New Jersey")
+    # ks = get_facilities_in_listed_counties(driver, "Kansas")
+    # lou = get_facilities_in_listed_counties(driver, "Louisiana")
+    # penn = get_facilities_in_listed_counties(driver, "Pennsylvania")
 
-    all_facilities_to_parse = (
-        virginia + ks + ny + nj + lou + penn + sorted(all_facilities_to_parse)
-    )
+    # all_facilities_to_parse = (
+    #     virginia + ks + ny + nj + lou + penn + sorted(all_facilities_to_parse)
+    # )
 
     df = pd.DataFrame(pd.read_csv("data/total_yearly_data.csv"))
     number_currently_in_file = df["County-Facility Detainer Sent"].nunique()
@@ -475,11 +475,11 @@ def create_df(driver):
 
 
 if __name__ == "__main__":
-    driver = startup()
+    driver = startup(reason="detain")
 
     # old_main()
 
     # get all the county-facility numbers for each month-year
-    create_df(driver)
+    scrape_detainers(driver)
 
     driver.close()
