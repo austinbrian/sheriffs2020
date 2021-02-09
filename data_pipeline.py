@@ -317,6 +317,94 @@ def arrest_data(grouped=True):
     return arr
 
 
+def has_2022_elex():
+    df = county_populations()
+    # source: https://theappeal.org/political-report/when-are-elections-for-prosecutor-and-sheriff/
+
+    full_states = [
+        "AL",
+        "CA",
+        "CO",
+        "IL",
+        "IN",
+        "KY",
+        "ME",
+        "MD",
+        "MI",
+        "MA",
+        "MN",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NM",
+        "NC",
+        "SD",
+        "TN",
+        "UT",
+        "WA",
+        "WI",
+        "WY",
+    ]
+
+    # SD --> Every county "with an election is on the midterm cycle" ??
+
+    true_county_dict = {
+        "DE": ["Sussex County", "New Castle County"],
+        "NJ": [
+            i.strip() + " County"
+            for i in "Burlington, Hudson, Hunterdon, Middlesex, Monmouth, Morris, Ocean, Passaic, Somerset, Sussex, Warren".split(
+                ","
+            )
+        ],
+        "NY": [
+            i.strip() + " County"
+            for i in "Allegany, Broome, Cayuga, Chautauqua, Clinton, Delaware, Essex, Franklin, Jefferson, Montgomery, Oneida, Onondaga, Ontario, Orange, Oswego, Otsego, Tompkins, Ulster".split(
+                ","
+            )
+        ],
+        "OR": [
+            i.strip() + " County"
+            for i in "Benton, Coos, Crook, Gilliam, Jackson, Jefferson, Josephine, Linn, Multnomah, Polk, Wasco, Yamhill".split(
+                ","
+            )
+        ],
+        "SC": [
+            i.strip() + " County"
+            for i in "Berkeley, Beaufort, Allendale, Chesterfield, Cherokee, Hampton, Kershaw".split(
+                ","
+            )
+        ],
+    }
+
+    false_county_dict = {
+        "CA": ["San Francisco County"],
+        "CO": ["Denver County"],
+        "ME": ["Franklin County", "Sagadahoc County"],
+        "MT": ["Deer Lodge County", "Silver Bow County"],
+        "NM": ["Lincoln County"],
+        "WA": ["Pierce County", "Snohomish County", "Whatcom County"],
+    }
+
+    df["has_election_2022"] = False
+    for state in full_states:
+        df.loc[df["ST"] == state, "has_election_2022"] = True
+
+    for state in true_county_dict:
+        df.loc[
+            (df["ST"] == state) & (df["CTYNAME"].isin(true_county_dict[state])),
+            "has_election_2022",
+        ] = True
+
+    for state in false_county_dict:
+        df.loc[
+            (df["ST"] == state) & (df["CTYNAME"].isin(false_county_dict[state])),
+            "has_election_2022",
+        ] = False
+
+    return df
+
+
 def merge_data():
     elex = election_counties_2020()
     jails = jails_data()
