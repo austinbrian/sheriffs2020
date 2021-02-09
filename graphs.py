@@ -43,7 +43,7 @@ def graph_elex(cdf, state="Nationwide", year=2021, detained_num=0, save=False):
     if state != "Nationwide":
         df = df[df.statecode == state]
     x = df["per_dem"]
-    y = df["CAP Local/Detainers"]
+    y = df["CAP Local/All"]
     colors = df.per_dem
     cm = plt.cm.get_cmap("RdBu")
     # area = 4000
@@ -66,7 +66,7 @@ def graph_elex(cdf, state="Nationwide", year=2021, detained_num=0, save=False):
         clim=(-1, 1),
     )
     ax.set_xlim([0, 1.05])
-    ax.set_ylim([-0.02, 0.35])
+    ax.set_ylim([-0.02, 1.02])
     #     plugins.connect(fig, plugins.PointLabelTooltip(fig))
     sct.set_alpha(0.85)
 
@@ -89,7 +89,7 @@ def graph_elex(cdf, state="Nationwide", year=2021, detained_num=0, save=False):
 
     # ax.set_xlabel("Total Detained", fontsize=16, **hfont)
     ax.set_xlabel("Percent Dem Presidential Vote 2020", fontsize=16, **hfont)
-    ax.set_ylabel("Ratio of CAP Local to Detainers ", fontsize=16, **hfont)
+    ax.set_ylabel("Ratio of CAP Local to All Arrests ", fontsize=16, **hfont)
     plt.title(f"Counties -- {state}", fontsize=22, **hfont)
     if state == "Nationwide":
         plt.text(
@@ -123,3 +123,94 @@ def graph_elex(cdf, state="Nationwide", year=2021, detained_num=0, save=False):
 
 
 # graph_elex(cdf, detained_num=250, save=True)
+
+
+def graph_elex_deaths_per_pop(
+    cdf, state="Nationwide", year=2021, detained_num=0, save=False
+):
+
+    df = cdf[cdf.has_election_2021]
+    df = df[df["Detainers Total"] > detained_num]
+
+    df = df.sort_values(by="per_dem")
+
+    if state != "Nationwide":
+        df = df[df.statecode == state]
+    x = df["per_dem"]
+    y = df["Deaths_per_thousand_pop"]
+    colors = df.per_dem
+    cm = plt.cm.get_cmap("RdBu")
+    # area = 400
+    area = (df.total_votes) / 100
+
+    df["name_init"] = df["county_name"] + ", " + df["statecode"]
+    text = df.name_init
+
+    plt.rc("font", weight="bold", family="sans-serif", size=12)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    sct = ax.scatter(
+        x,
+        y,
+        linewidths=2,
+        s=area,
+        edgecolor="w",
+        c=colors,
+        cmap=cm,
+        clim=(-1, 1),
+    )
+    # ax.set_xlim([0, 1.05])
+    # ax.set_ylim([-0.02, 1.02])
+    #     plugins.connect(fig, plugins.PointLabelTooltip(fig))
+    sct.set_alpha(0.85)
+
+    labels = ["{}".format(i) for i in text]
+    label2 = ["{} detainees".format(i) for i in df["Detainers Total"]]
+
+    #     tooltip = mpld3.plugins.PointLabelTooltip(sct, labels=zip(labels,label2))
+    #     mpld3.plugins.connect(fig, tooltip)
+
+    #     for labeli, xi, yi in zip(text, x, y):
+    #         ax.annotate(labeli,xy=(xi, yi))
+
+    for labeli, xi, yi in zip(text, x, y):
+        # if yi > (0.001 * max(y)):
+        ax.annotate(labeli, xy=(xi, yi))
+
+    hfont = {"fontname": "DejaVu Sans"}
+
+    # ax.set_xlabel("Total Detained", fontsize=16, **hfont)
+    ax.set_xlabel("Percent Dem Presidential Vote 2020", fontsize=16, **hfont)
+    ax.set_ylabel("Deaths per thousand jailed population", fontsize=16, **hfont)
+
+    plt.title(f"Counties -- {state}", fontsize=22, **hfont)
+    if state == "Nationwide":
+        plt.text(
+            0.5,
+            0.99,
+            f"Elections in {year} and {detained_num}+ detentions",
+            horizontalalignment="center",
+            verticalalignment="center",
+            transform=ax.transAxes,
+            fontsize=16,
+        )
+    else:
+        plt.text(
+            0.5,
+            0.99,
+            f"Elections in {year}",
+            horizontalalignment="center",
+            verticalalignment="center",
+            transform=ax.transAxes,
+            fontsize=16,
+        )
+
+    # sct_html = fig_to_html(fig)
+    if save == True:
+        mpld3.save_html(
+            # fig, f"../findings/2021_national_counties.html"
+            # fig, f"../findings/elex_19_20/{year}/elections_{year}_counties_{state}.html"
+            fig,
+            f"../findings/national_{year}_elections_deaths_dem_pct.html",
+        )
+    return mpld3.display()

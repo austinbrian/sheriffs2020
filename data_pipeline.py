@@ -321,12 +321,9 @@ def merge_data():
     elex = election_counties_2020()
     jails = jails_data()
     elex["statecode"] = elex["state_name"].map(dict(zip(jails.state, jails.statecode)))
-    jails["d_1619"] = (
-        jails["fips"].map(jails.groupby("fips")["d1619"].sum().to_dict()).fillna(0)
-    )
-    jails["avg_adp1619_total"] = jails["fips"].map(
-        jails.groupby("fips")["avg_adp1619"].sum().to_dict()
-    )
+    # jails["d_1619"] = (
+    #     jails["fips"].map(jails.groupby("fips")["d1619"].sum().to_dict()).fillna(0)
+    # )
 
     # multiple facilities in several counties so this adds them
     jdf = (
@@ -351,9 +348,9 @@ def merge_data():
     jdf["avg_adp_1619"] = jdf[["adp2016", "adp2017", "adp2018", "adp2019"]].apply(
         lambda x: np.mean(x[x != 0]), axis=1
     )
-    jdf["Deaths_per_thousand_pop"] = jdf["d1619"] / jdf["avg_adp1619"] * 1000.0
+    jdf["Deaths_per_thousand_pop"] = jdf["d1619"] / jdf["avg_adp_1619"] * 1000.0
     df = elex.merge(
-        jails[["fips", "d_1619", "avg_adp1619", "Deaths_per_thousand_pop"]],
+        jails[["fips", "d1619", "avg_adp1619", "Deaths_per_thousand_pop"]],
         how="left",
         left_on="county_fips",
         right_on="fips",
