@@ -1,5 +1,6 @@
 from datetime import datetime
 import pandas as pd
+import numpy as np
 import us
 
 import imm_scraper as im
@@ -229,11 +230,11 @@ def mark_has_elex(
             ] = True
             county_counter += 1
 
-    try:
-        assert len(df[df[elec_field]]) == county_counter
-    except AssertionError as e:
-        print(county_counter, len(df[df[elec_field]]))
-        raise (e)
+    # try:
+    #     assert len(df[df[elec_field]]) == county_counter
+    # except AssertionError as e:
+    #     print(county_counter, len(df[df[elec_field]]))
+    #     raise (e)
 
     return df
 
@@ -251,13 +252,39 @@ def jails_data():
             "d2019",
         ]
     ].fillna(0)
+    df[["adp2016", "adp2017", "adp2018", "adp2019",]] = df[
+        [
+            "adp2016",
+            "adp2017",
+            "adp2018",
+            "adp2019",
+        ]
+    ].fillna(0)
     # inplace=True doesn't work here, which isn't great
     df["d1619"] = df.apply(lambda x: x.d2016 + x.d2017 + x.d2018 + x.d2019, axis=1)
+    df["total_adp1619"] = df.apply(
+        lambda x: x.adp2016 + x.adp2017 + x.adp2018 + x.adp2019, axis=1
+    )  # to get number of years -- sometimes 0 fills in, not what we want
+    df["yrs_adp1619"] = df.apply(
+        lambda x: len(
+            [l for l in [x.adp2016, x.adp2017, x.adp2018, x.adp2019] if l > 0]
+        ),
+        axis=1,
+    )
+    # it turns out we can drop anything with yrs_adp1619<1
+    df.drop(df[df.yrs_adp1619 < 1].index, inplace=True)
+
+    df["avg_adp1619"] = df["total_adp1619"] / df["yrs_adp1619"]
+    df["Deaths_per_thousand_pop"] = df["d1619"] / df["avg_adp1619"] * 1000.0
+    df.drop(["total_adp1619", "yrs_adp1619"], axis=1, inplace=True)
     return df
 
 
 def deaths_data():
-    """Individual deaths and causes"""
+    """Individual deaths and causes
+    introduce deaths per adp
+    roll it up 16-19
+    """
     rdtypes = {"id": str, "fips": str, "year": int}
     df = pd.read_csv("../data/reuters/all_jails.csv", encoding="cp1252", dtype=rdtypes)
     return df
@@ -284,6 +311,9 @@ def arrest_data(grouped=True):
             .sum()
             .to_dict()
         )
+        arr["All_1619"] = arr["County/Surrounding Area"].map(
+            arr.groupby("County/Surrounding Area")["All"].sum().to_dict()
+        )
     return arr
 
 
@@ -294,15 +324,43 @@ def merge_data():
     jails["d_1619"] = (
         jails["fips"].map(jails.groupby("fips")["d1619"].sum().to_dict()).fillna(0)
     )
+    jails["avg_adp1619_total"] = jails["fips"].map(
+        jails.groupby("fips")["avg_adp1619"].sum().to_dict()
+    )
+
+    # multiple facilities in several counties so this adds them
+    jdf = (
+        jails[
+            [
+                "fips",
+                "d2016",
+                "d2017",
+                "d2018",
+                "d2019",
+                "adp2016",
+                "adp2017",
+                "adp2018",
+                "adp2019",
+                "d1619",
+            ]
+        ]
+        .groupby("fips")
+        .sum()
+        .reset_index()
+    )
+    jdf["avg_adp_1619"] = jdf[["adp2016", "adp2017", "adp2018", "adp2019"]].apply(
+        lambda x: np.mean(x[x != 0]), axis=1
+    )
+    jdf["Deaths_per_thousand_pop"] = jdf["d1619"] / jdf["avg_adp1619"] * 1000.0
     df = elex.merge(
-        jails[["fips", "d_1619"]],
+        jails[["fips", "d_1619", "avg_adp1619", "Deaths_per_thousand_pop"]],
         how="left",
         left_on="county_fips",
         right_on="fips",
     )
     arr = arrest_data(grouped=True)
     df = df.merge(
-        arr[["County/Surrounding Area", "CAPLocal_1619", "County", "ST"]],
+        arr[["County/Surrounding Area", "CAPLocal_1619", "County", "ST", "All_1619"]],
         how="left",
         left_on=["county_name", "statecode"],
         right_on=["County", "ST"],
@@ -330,8 +388,47 @@ def merge_data():
     # money column: cap local / total detainers
     df["CAP Local/Detainers"] = df["CAPLocal_1619"] / df["Detainers Total"]
 
+    ### don't use Total Detainers, instead use "All" from arrests data
+    ## TODO: assert that this falls between 0 and 1
+    df["CAP Local/All"] = df["CAPLocal_1619"] / df["All_1619"]
+
     df.drop(["County_x", "County_y"], axis=1, inplace=True)
     return df.drop_duplicates()
+
+
+def wholeads_data(group: str = "electeds"):
+    url = "https://wholeads.us/wp-content/uploads/2020/06/Sheriffs-Report-Data.xlsx"
+    if group.lower() == "electeds":
+        electeds = pd.read_excel(url, sheet_name="Electeds Raw")
+        return electeds
+    elif group.lower() == "candidates":
+        cands = pd.read_excel(
+            url,
+            sheet_name="Candidates Raw",
+            usecols=[
+                "RDIndex2019",
+                "Candidate UUID",
+                "State",
+                "Office Level",
+                "OCDID",
+                "Electoral District",
+                "Office UUID",
+                "Unopposed",
+                "Office Name",
+                "Seat ID",
+                "Number Elected",
+                "Candidate Name",
+                "Candidate Party",
+                "Party ID Roll Up",
+                "White/Non-White",
+                "Race",
+                "Gender",
+                "Winner Y/N",
+            ],
+        )
+        return cands
+    else:
+        return {"electeds": electeds, "candidates": cands}
 
 
 if __name__ == "__main__":
