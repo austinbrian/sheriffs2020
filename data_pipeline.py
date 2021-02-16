@@ -405,6 +405,43 @@ def has_2022_elex():
     return df
 
 
+def flatten(lis):
+    for item in lis:
+        if isinstance(item, list) and not isinstance(item, str):
+            for x in flatten(item):
+                yield x
+        else:
+            yield item
+
+
+def unstack_multi_jurisdictions(tst):
+    mdf = tst.loc[np.repeat(tst.index.values, tst.num_jurisdictions.astype(int))]
+    juris = list(
+        flatten(
+            tst.loc[:, "ORI Agency Identifier (if available)"].str.split(";").values
+        )
+    )
+    mdf["ori"] = juris
+    return mdf
+
+
+def police_shootings():
+    mpv = pd.read_csv("../data/MPVDatasetDownload.xlsx - 2013-2020 Police Killings.csv")
+    # there is just one weird NaN jurisdiction here -- the Burlington Northern Santa Fe Railway PD, in Denver
+    mpv = mpv[mpv["ORI Agency Identifier (if available)"].notna()]
+    mpv["num_jurisdictions"] = mpv["ORI Agency Identifier (if available)"].apply(
+        lambda x: len(x.split(";"))
+    )
+    # duplicate multi-jurisdiction shootings
+    mpv = unstack_multi_jurisdictions(mpv)
+    # drop federal jurisdictions
+    mpv = mpv[~mpv["ori"].apply(lambda x: x[-2:] != "00")]
+    # drop the double zero
+    mpv["ori"] = mpv.ori.apply(lambda x: x[:-2])
+
+    return mpv
+
+
 def merge_data():
     elex = election_counties_2020()
     jails = jails_data()
@@ -457,6 +494,11 @@ def merge_data():
         county_field="county_name",
         state_field="state_name",
     )
+    # add in a column for 2022
+    df["has_2022_election"] = df.county_fips.map(
+        has_2022_elex().set_index("FIPS")["has_election_2022"].to_dict()
+    )
+
     # now for the big part, merging with detainers
     md = MergedDetainers().dropna()
 
@@ -469,7 +511,6 @@ def merge_data():
         left_on=["state_name", "county_name"],
         right_on=["State", "County"],
     )
-
     # money column: cap local / total detainers
     df["CAP Local/Detainers"] = df["CAPLocal_1619"] / df["Detainers Total"]
 
