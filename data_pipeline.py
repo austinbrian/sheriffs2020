@@ -296,7 +296,7 @@ def reuters_codesheet():
     )
 
 
-def arrest_data(grouped=True):
+def imm_arrest_data(grouped=True):
     arr = pd.read_csv("../data/arrest_data.csv", thousands=",")
     arr["c_area_split"] = arr["County/Surrounding Area"].str.split(", ")
     arr["lensplit"] = arr["c_area_split"].apply(lambda x: len(x))
@@ -314,6 +314,60 @@ def arrest_data(grouped=True):
         arr["All_1619"] = arr["County/Surrounding Area"].map(
             arr.groupby("County/Surrounding Area")["All"].sum().to_dict()
         )
+    return arr
+
+
+def total_arrest_data():
+    arr = pd.read_csv(
+        "../data/ICPSR_37056/DS0001/37056-0001-Data.tsv", sep="\t", low_memory=False
+    )
+    # this dataset has some wild choices for missing data
+    # mostly it's 99998 or 99999, but there's a few special cases to handle
+    colvals = [
+        "STNAME",
+        "AGENCY",
+        "ORI",
+        "MSA",
+        "POP",
+        "OFFENSE",
+        "OCCUR",
+        "MONTH",
+        "MOHEADER",
+        "AW",
+        "AB",
+        "AI",
+        "AA",
+        "JW",
+        "JB",
+        "JI",
+        "JA",
+        "AH",
+        "AN",
+    ] + "M0_9	M10_12	M13_14	M15	M16	M17	M18	M19	M20	M21	M22	M23	M24	M25_29	M30_34	M35_39	M40_44	M45_49	M50_54	M55_59	M60_64	M65	F0_9	F10_12	F13_14	F15	F16	F17	F18	F19	F20	F21	F22	F23	F24	F25_29	F30_34	F35_39	F40_44	F45_49	F50_54	F55_59	F60_64	F65".split(
+        "\t"
+    )
+    nancols = [
+        "MONTH",
+        "MOHEADER",
+        "OFFENSE",
+        "OCCUR",
+    ]
+    colnans = [
+        98,
+        [998, 0],
+        [998, "998"],
+        998,
+    ]
+    arr = (
+        arr[colvals]
+        .replace([99999, 99998], np.nan)
+        .replace(dict(zip(nancols, colnans)), np.nan)
+    )
+    # no better way, seemingy of getting this info, so we're just going to sum race
+    arr["adult_arrests"] = arr[["AW", "AB", "AI", "AA"]].sum(axis=1)
+    arr["juv_arrests"] = arr[["JW", "JB", "JI", "JA"]].sum(axis=1)
+    # and all Hispanic markers are NaN in this dataset??
+    arr["tot_arrests"] = arr.adult_arrests + arr.juv_arrests
     return arr
 
 
@@ -425,21 +479,91 @@ def unstack_multi_jurisdictions(tst):
     return mdf
 
 
-def police_shootings():
-    mpv = pd.read_csv("../data/MPVDatasetDownload.xlsx - 2013-2020 Police Killings.csv")
+def police_killings():
+    mpv = pd.read_csv(
+        "../data/MPVDatasetDownload.xlsx - 2013-2020 Police Killings.csv",
+        low_memory=False,
+    )
     # there is just one weird NaN jurisdiction here -- the Burlington Northern Santa Fe Railway PD, in Denver
     mpv = mpv[mpv["ORI Agency Identifier (if available)"].notna()]
     mpv["num_jurisdictions"] = mpv["ORI Agency Identifier (if available)"].apply(
         lambda x: len(x.split(";"))
     )
+    mpv["long_ori"] = mpv["ORI Agency Identifier (if available)"]
     # duplicate multi-jurisdiction shootings
     mpv = unstack_multi_jurisdictions(mpv)
     # drop federal jurisdictions
     mpv = mpv[~mpv["ori"].apply(lambda x: x[-2:] != "00")]
     # drop the double zero
     mpv["ori"] = mpv.ori.apply(lambda x: x[:-2])
+    # most recent data is for 2016, and "POP" is the population for the facility for the full year
+    arr = total_arrest_data()
+    mpv["pop_jailed_2016"] = mpv.ori.map(arr.groupby(["ORI"])["POP"].max().to_dict())
+    mpv["arrests_2016"] = mpv.ori.map(arr.groupby("ORI")["tot_arrests"].sum().to_dict())
+
+    # it looks like the national scorecard file is a better source for this
+    # nsd = nationwide_scorecard_database()
+    # mpv = mpv.merge(nsd, left_on="ORI Agency Identifier (if available)", right_on="ori")
 
     return mpv
+
+
+def shootings_per_1k_arrests():
+    mpv = police_killings()
+    spka = (
+        mpv[
+            [
+                "City",
+                "State",
+                "County",
+                "ori",
+                "MPV ID",
+                "arrests_2016",
+                "pop_jailed_2016",
+            ]
+        ]
+        .groupby(
+            [
+                "State",
+                "County",
+                "ori",
+            ]
+        )
+        .agg({"MPV ID": "count", "arrests_2016": sum, "pop_jailed_2016": max})
+        .reset_index()
+    )
+    spka["shootings_per_k_arr"] = spka["MPV ID"] / (spka["arrests_2016"] / 1000)
+    spka["shot_per_jailed_pop"] = spka["MPV ID"] / (spka["pop_jailed_2016"] / 1000)
+    spka.replace(
+        {"shootings_per_k_arr": np.inf, "shot_per_jailed_pop": np.inf},
+        np.nan,
+        inplace=True,
+    )
+    return spka.sort_values(by="shootings_per_k_arr", ascending=False)
+
+
+def nationwide_scorecard_database(**kwargs):
+    """
+    https://docs.google.com/spreadsheets/d/10zEUA5l2-4_bo0HPxUULJ81KIDPnDkL2OxYuqFoJ8zU/edit#gid=1623145710
+    """
+    df = pd.read_csv(
+        "../data/Nationwide_Scorecard_Database.csv",
+        converters={
+            "fips_state_code": lambda x: "{:02d}".format(int(x)),
+            "fips_county_code": lambda x: "{:03d}".format(int(x)),
+        },
+        low_memory=False,
+        **kwargs
+    )
+    df["fips"] = df["fips_state_code"] + df["fips_county_code"]
+    df["total_arrests"] = df[
+        "arrests_2013,arrests_2014,arrests_2015,arrests_2016,arrests_2017,arrests_2018".split(
+            ","
+        )
+    ].sum(axis=1)
+    # for our purposes we are only interested in the sheriff agencies
+
+    return df
 
 
 def merge_data():
@@ -479,8 +603,8 @@ def merge_data():
         how="left",
         left_on="county_fips",
         right_on="fips",
-    )
-    arr = arrest_data(grouped=True)
+    ).drop("fips", axis=1)
+    arr = imm_arrest_data(grouped=True)
     df = df.merge(
         arr[["County/Surrounding Area", "CAPLocal_1619", "County", "ST", "All_1619"]],
         how="left",
@@ -495,7 +619,7 @@ def merge_data():
         state_field="state_name",
     )
     # add in a column for 2022
-    df["has_2022_election"] = df.county_fips.map(
+    df["has_election_2022"] = df.county_fips.map(
         has_2022_elex().set_index("FIPS")["has_election_2022"].to_dict()
     )
 
@@ -507,7 +631,6 @@ def merge_data():
     md["Detainers Total"] = md.County.map(md.groupby("County")["Total"].sum().to_dict())
     df = df.merge(
         md[["State", "County", "Detainers Total"]],
-        how="left",
         left_on=["state_name", "county_name"],
         right_on=["State", "County"],
     )
@@ -517,6 +640,31 @@ def merge_data():
     ### don't use Total Detainers, instead use "All" from arrests data
     ## TODO: assert that this falls between 0 and 1
     df["CAP Local/All"] = df["CAPLocal_1619"] / df["All_1619"]
+
+    # add in arrest columns from national scorecard
+    nsd = nationwide_scorecard_database()
+
+    # # also want shooting data to be in scorecard
+    mpv = police_killings()
+    nsd["killings"] = nsd["ori"].map(
+        mpv.groupby("long_ori")["MPV ID"].count().to_dict()
+    )
+    gnsd = (
+        nsd.groupby("fips")[
+            list(filter(lambda x: "arrest" in x, nsd.columns)) + ["killings"]
+        ]
+        .sum()
+        .reset_index()
+    )
+    gnsd["killings_per_k_arrests"] = gnsd["killings"] / (gnsd["total_arrests"] / 1000)
+    gnsd["low_level_per_arrest"] = gnsd["low_level_arrests"] / gnsd["total_arrests"]
+
+    df["killings_per_k_arrests"] = df.county_fips.map(
+        gnsd.set_index("fips")["killings_per_k_arrests"].to_dict()
+    )
+    df["low_level_per_arrest"] = df.county_fips.map(
+        gnsd.set_index("fips")["low_level_per_arrest"].to_dict()
+    )
 
     df.drop(["County_x", "County_y"], axis=1, inplace=True)
     return df.drop_duplicates()
