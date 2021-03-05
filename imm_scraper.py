@@ -5,6 +5,7 @@ import lxml.html
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
+import time
 from time import sleep
 from random import randint
 import datetime
@@ -126,6 +127,7 @@ def select_col_dropdown(driver, val="State", col=1, verbose=False):
 
 
 def capture_header(driver, col=1):
+    div = driver.find_element_by_id(f"col{col}head2")
     header = div.find_element_by_tag_name("thead")
     # all these headers are the col name and " Total" so parse that total
     hed_text_list = [header.text[: header.text.index(" Total")], "Total"]
