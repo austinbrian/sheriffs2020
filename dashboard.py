@@ -10,14 +10,13 @@ import pickle5 as pickle
 
 from dashfigs import make_fig
 
-# df = pd.read_csv("https://raw.githubusercontent.com/plotly/datasets/master/solar.csv")
-# df = pd.read_pickle("data/merged_data.pkl")
+#### Initialize app
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 app.title = "Sheriff dashboard"
-# df = pd.read_pickle("data/merged_data.pkl")
 
+#### Get data
 with open("data/merged_data.pkl", "rb") as fh:
     df = pickle.load(fh)
 
