@@ -1,1 +1,1 @@
-web: guicorn app:server
+web: gunicorn app:server
