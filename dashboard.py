@@ -75,7 +75,16 @@ def year_picker(year):
         color="per_dem",
         color_continuous_scale=px.colors.sequential.RdBu,
         hover_name="Electoral District",
-        hover_data={"State": True, "per_dem": ":.2%", "CAP Local/All": ":0.2f"},
+        hover_data={
+            "State": True,
+            "per_dem": ":.2%",
+            "CAP Local/All": ":0.2f",
+            "votesize": False,
+            "total_votes": ":,f",
+            "Official Name": True,
+            "Party Roll Up": True,
+        },
+        labels={"per_dem": "Dem %", "total_votes": "2020 Total Votes"},
     )
     return fig
 
