@@ -13,7 +13,8 @@ from dashfigs import make_fig
 # df = pd.read_pickle("data/merged_data.pkl")
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-# global df
+server = app.server
+app.title = "Sheriff dashboard"
 df = pd.read_pickle("data/merged_data.pkl")
 
 # style the df
