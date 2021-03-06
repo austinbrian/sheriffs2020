@@ -67,26 +67,7 @@ app.layout = html.Div(
 )
 def year_picker(year):
     df2 = df[df[f"has_election_{year}"]]
-    df2["votesize"] = df["total_votes"].apply(lambda x: math.sqrt(x))
-    fig = px.scatter(
-        df2,
-        x="per_dem",
-        y="CAP Local/All",
-        size="votesize",
-        color="per_dem",
-        color_continuous_scale=px.colors.sequential.RdBu,
-        hover_name="Electoral District",
-        hover_data={
-            "State": True,
-            "per_dem": ":.2%",
-            "CAP Local/All": ":0.2f",
-            "votesize": False,
-            "total_votes": ":,f",
-            "Official Name": True,
-            "Party Roll Up": True,
-        },
-        labels={"per_dem": "Dem %", "total_votes": "2020 Total Votes"},
-    )
+    fig = make_fig(df2)
     return fig
 
 
