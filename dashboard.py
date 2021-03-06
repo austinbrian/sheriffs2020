@@ -6,6 +6,7 @@ import dash_html_components as html
 import dash_table
 import pandas as pd
 import plotly.express as px
+import pickle5 as pickle
 
 from dashfigs import make_fig
 
@@ -15,10 +16,10 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 app.title = "Sheriff dashboard"
-df = pd.read_pickle("data/merged_data.pkl")
+# df = pd.read_pickle("data/merged_data.pkl")
 
-# style the df
-# df["per_dem"] = df.per_dem.apply(lambda x: "{:.2%}".format(x))
+with open("data/merged_data.pkl", "rb") as fh:
+    df = pickle.load(fh)
 
 states_21 = [i for i in df[df.has_election_2021].state_name.unique()]
 usecols = [
