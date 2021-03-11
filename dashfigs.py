@@ -3,13 +3,15 @@ import sys
 sys.path.append("..")
 import plotly.graph_objects as go
 import plotly.express as px
+import dash_table.FormatTemplate as FormatTemplate
 
 import pandas as pd
+
 
 # df = pd.read_pickle("data/merged_data.pkl")
 
 
-def make_fig(df):
+def make_bubble_chart_fig(df):
     df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     fig = px.scatter(
         df,
@@ -45,3 +47,57 @@ def make_fig(df):
         },
     )
     return fig
+
+
+def make_table(df):
+    pass
+
+
+def make_table_columns(df):
+
+    cols = [
+        {"id": "statecode", "name": "ST", "type": "text", "hideable": True},
+        {"id": "State", "name": "State", "type": "text"},
+        {"id": "Electoral District", "name": "County", "type": "text"},
+        {
+            "id": "Office Name",
+            "name": "Office",
+            "type": "text",
+            "format": {"specifier": ":.15"},
+            "hideable": True,
+        },
+        {"id": "Official Name", "name": "Sherriff Name", "type": "text"},
+        {"id": "Party Roll Up", "name": "Party", "type": "text"},
+        {
+            "id": "per_dem",
+            "name": "% Dem",
+            "type": "numeric",
+            "format": FormatTemplate.percentage(2),
+        },
+        {
+            "id": "CAP Local/All",
+            "name": "CAP Local/All",
+            "type": "numeric",
+            "format": FormatTemplate.percentage(2),
+        },
+        {
+            "id": "Detainers Total",
+            "name": "Detainers Total",
+            "type": "numeric",
+            "format": {"specifier": ",.0f"},
+        },
+        {
+            "id": "Deaths_per_thousand_pop",
+            "name": "Deaths per 1k jailed pop",
+            "type": "numeric",
+            "format": {"specifier": ".1f"},
+        },
+        {
+            "id": "killings_per_k_arrests",
+            "name": "Killings per 1k arrests",
+            "type": "numeric",
+            "format": {"specifier": ",.1f"},
+        },
+    ]
+
+    return cols

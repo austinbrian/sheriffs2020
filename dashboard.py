@@ -7,7 +7,7 @@ import plotly.express as px
 import pickle5 as pickle
 from dash.dependencies import Input, Output, State
 
-from dashfigs import make_fig
+from dashfigs import make_bubble_chart_fig, make_table_columns
 
 #### Initialize app
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
@@ -19,16 +19,6 @@ app.title = "Sheriffs for Trusting Communities"
 with open("data/merged_data.pkl", "rb") as fh:
     df = pickle.load(fh)
 
-usecols = [
-    "statecode",
-    "State",
-    "Electoral District",
-    "Office Name",
-    "Official Name",
-    "Party Roll Up",
-    "per_dem",
-    "CAP Local/All",
-]
 
 app.layout = html.Div(
     [
@@ -52,21 +42,25 @@ app.layout = html.Div(
                 ),
             ]
         ),
-        dcc.Graph(id="bubble_chart", figure=make_fig(df)),
+        dcc.Graph(id="bubble_chart", figure=make_bubble_chart_fig(df)),
         # TODO: fix styling to change the names of the columns
         dash_table.DataTable(
             id="table",
-            columns=[{"name": i, "id": i} for i in df[usecols]],
+            columns=make_table_columns(df),
             data=df.to_dict("records"),
             sort_action="native",
             filter_action="native",
             style_cell={"textAlign": "left"},
             style_as_list_view=True,
             style_cell_conditional=[
-                {
-                    "if": {"column_id": "per_dem", "column_id": "CAP Local/All"},
-                    "textAlign": "right",
-                }
+                {"if": {"column_id": c}, "textAlign": "right"}
+                for c in [
+                    "per_dem",
+                    "CAP Local/All",
+                    "Detainers Total",
+                    "Deaths_per_thousand_pop",
+                    "killings_per_k_arrests",
+                ]
             ],
         ),
     ]
@@ -86,7 +80,7 @@ def update_bubble_chart(year, state):
         else:
             state = [state]
     df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
-    fig = make_fig(df2)
+    fig = make_bubble_chart_fig(df2)
     return fig
 
 
