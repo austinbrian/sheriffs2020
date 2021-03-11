@@ -25,12 +25,9 @@ app.layout = html.Div(
         html.H1("Sheriffs on the Bubble"),
         html.Div(
             children=[
-                dcc.Dropdown(
-                    id="year_dropdown",
-                    options=[{"label": i, "value": i} for i in [2021, 2022]],
-                    value="2022",
-                    placeholder="Election Year",
-                    style=dict(width="200px"),
+                html.P(
+                    "Select geography and election year below",
+                    style={"font-style": "italic"},
                 ),
                 dcc.Dropdown(
                     id="state_dropdown",
@@ -40,28 +37,73 @@ app.layout = html.Div(
                     multi=True,
                     style=dict(width="400px"),
                 ),
+                dcc.RadioItems(
+                    id="year_dropdown",
+                    options=[{"label": i, "value": i} for i in [2021, 2022]],
+                    value="2022",
+                    labelStyle={"display": "inline-block", "font-style": "bold"},
+                    style={
+                        "padding": "20px",
+                        "max-width": "120px",
+                        "display": "flex",
+                        "justify-content": "space-between",
+                    },
+                ),
             ]
         ),
-        dcc.Graph(id="bubble_chart", figure=make_bubble_chart_fig(df)),
-        # TODO: fix styling to change the names of the columns
-        dash_table.DataTable(
-            id="table",
-            columns=make_table_columns(df),
-            data=df.to_dict("records"),
-            sort_action="native",
-            filter_action="native",
-            style_cell={"textAlign": "left"},
-            style_as_list_view=True,
-            style_cell_conditional=[
-                {"if": {"column_id": c}, "textAlign": "right"}
-                for c in [
-                    "per_dem",
-                    "CAP Local/All",
-                    "Detainers Total",
-                    "Deaths_per_thousand_pop",
-                    "killings_per_k_arrests",
-                ]
-            ],
+        html.Div(
+            children=[
+                html.P("Select y-axis", style={"font-style": "italic"}),
+                dcc.Dropdown(
+                    id="yaxis-column",
+                    options=[
+                        {"label": l, "value": v}
+                        for l, v in [
+                            ("CAP Local/All", "CAP Local/All"),
+                            ("Total Detainers", "Detainers Total"),
+                            (
+                                "Deaths per Thousand Jailed Population",
+                                "Deaths_per_thousand_pop",
+                            ),
+                            (
+                                "Police Killings per Thousand Arrests",
+                                "killings_per_k_arrests",
+                            ),
+                        ]
+                    ],
+                    value="CAP Local/All",
+                    style=dict(width="400px"),
+                ),
+                dcc.Graph(
+                    id="bubble_chart", figure=make_bubble_chart_fig(df, "CAP Local/All")
+                ),
+                html.P(
+                    "The table below can be filtered using the filter row, and some columns can be toggled on or off.",
+                    style={"font-style": "italic"},
+                ),
+                dash_table.DataTable(
+                    id="table",
+                    columns=make_table_columns(df),
+                    data=df.to_dict("records"),
+                    sort_action="native",
+                    filter_action="native",
+                    style_cell={"textAlign": "left"},
+                    style_as_list_view=True,
+                    style_cell_conditional=[
+                        {
+                            "if": {"column_id": c},
+                            "textAlign": "right",
+                        }
+                        for c in [
+                            "per_dem",
+                            "CAP Local/All",
+                            "Detainers Total",
+                            "Deaths_per_thousand_pop",
+                            "killings_per_k_arrests",
+                        ]
+                    ],
+                ),
+            ]
         ),
     ]
 )
@@ -69,9 +111,13 @@ app.layout = html.Div(
 
 @app.callback(
     Output("bubble_chart", "figure"),
-    [Input("year_dropdown", "value"), Input("state_dropdown", "value")],
+    [
+        Input("year_dropdown", "value"),
+        Input("state_dropdown", "value"),
+        Input("yaxis-column", "value"),
+    ],
 )
-def update_bubble_chart(year, state):
+def update_bubble_chart(year, state, yaxis):
     if state == "Nationwide":
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
@@ -80,7 +126,7 @@ def update_bubble_chart(year, state):
         else:
             state = [state]
     df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
-    fig = make_bubble_chart_fig(df2)
+    fig = make_bubble_chart_fig(df2, yaxis)
     return fig
 
 
@@ -98,7 +144,10 @@ def reset_states_to_nationwide_on_year_switch(value):
 
 @app.callback(
     Output("table", "data"),
-    [Input("year_dropdown", "value"), Input("state_dropdown", "value")],
+    [
+        Input("year_dropdown", "value"),
+        Input("state_dropdown", "value"),
+    ],
 )
 def update_table(year, state):
     if state == "Nationwide":

@@ -11,12 +11,12 @@ import pandas as pd
 # df = pd.read_pickle("data/merged_data.pkl")
 
 
-def make_bubble_chart_fig(df):
+def make_bubble_chart_fig(df, yaxis):
     df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     fig = px.scatter(
         df,
         x="per_dem",
-        y="CAP Local/All",
+        y=yaxis,
         size="votesize",
         color="per_dem",
         color_continuous_scale=px.colors.sequential.RdBu,
