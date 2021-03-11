@@ -37,17 +37,24 @@ usecols = [
 app.layout = html.Div(
     [
         html.H1("Sheriffs on the Bubble"),
-        dcc.Dropdown(
-            id="year_dropdown",
-            options=[{"label": i, "value": i} for i in [2021, 2022]],
-            value="2022",
-            placeholder="Election Year",
-        ),
-        dcc.Dropdown(
-            id="state_dropdown",
-            options=[{"label": i, "value": i} for i in df.State.unique()],
-            value="Nationwide",
-            placeholder="Nationwide",
+        html.Div(
+            children=[
+                dcc.Dropdown(
+                    id="year_dropdown",
+                    options=[{"label": i, "value": i} for i in [2021, 2022]],
+                    value="2022",
+                    placeholder="Election Year",
+                    style=dict(width="200px"),
+                ),
+                dcc.Dropdown(
+                    id="state_dropdown",
+                    options=[{"label": i, "value": i} for i in df.State.unique()],
+                    value="Nationwide",
+                    placeholder="Nationwide",
+                    multi=True,
+                    style=dict(width="200px"),
+                ),
+            ]
         ),
         dcc.Graph(id="bubble_chart", figure=make_fig(df)),
         dash_table.DataTable(
@@ -69,7 +76,10 @@ def update_bubble_chart(year, state):
     if state == "Nationwide":
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
-        state = [state]
+        if isinstance(state, list):
+            state = state
+        else:
+            state = [state]
     df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
     fig = make_fig(df2)
     return fig
@@ -95,7 +105,10 @@ def update_table(year, state):
     if state == "Nationwide":
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
-        state = [state]
+        if isinstance(state, list):
+            state = state
+        else:
+            state = [state]
     df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
     return df2.to_dict("records")
 
