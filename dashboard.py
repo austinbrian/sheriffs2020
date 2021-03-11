@@ -31,8 +31,7 @@ usecols = [
     "Official Name",
     "Party Roll Up",
     "per_dem",
-    "has_election_2021",
-    "has_election_2022",
+    "CAP Local/All",
 ]
 
 app.layout = html.Div(
@@ -80,13 +79,25 @@ def update_bubble_chart(year, state):
 def update_state_dropdown_on_year_select(year):
     opts = df[df[f"has_election_{year}"]].State.unique()
     options = [{"label": opt, "value": opt} for opt in opts]
-    # options.append({"label": "Nationwide", "value": "Nationwide"})
     return options
 
 
 @app.callback(Output("state_dropdown", "value"), [Input("state_dropdown", "options")])
-def callback(value):
+def reset_states_to_nationwide_on_year_switch(value):
     return "Nationwide"
+
+
+@app.callback(
+    Output("table", "data"),
+    [Input("year_dropdown", "value"), Input("state_dropdown", "value")],
+)
+def update_table(year, state):
+    if state == "Nationwide":
+        state = df[df[f"has_election_{year}"]].State.unique()
+    else:
+        state = [state]
+    df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
+    return df2.to_dict("records")
 
 
 if __name__ == "__main__":
