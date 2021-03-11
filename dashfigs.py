@@ -1,5 +1,4 @@
 import sys
-import math
 
 sys.path.append("..")
 import plotly.graph_objects as go
@@ -11,7 +10,7 @@ import pandas as pd
 
 
 def make_fig(df):
-    df["votesize"] = df["total_votes"].apply(lambda x: math.sqrt(x))
+    df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     fig = px.scatter(
         df,
         x="per_dem",
@@ -29,14 +28,18 @@ def make_fig(df):
             "Official Name": True,
             "Party Roll Up": True,
         },
-        labels={"per_dem": "Dem %", "total_votes": "2020 Total Votes"},
+        labels={
+            "per_dem": "Dem %",
+            "total_votes": "2020 Total Votes",
+            "Official Name": "Sheriff Name",
+            "Party Roll Up": "Party",
+        },
     )
 
     fig.update_layout(
         {
             "plot_bgcolor": "rgba(245,245,245)",
             "paper_bgcolor": "rgba(245,245,245)",
-            # "paper_bgcolor": "rgba(0,0,0,0)",
             "xaxis": {"showgrid": False, "tickformat": ",.0%"},
             "yaxis": {"showgrid": False},
         },

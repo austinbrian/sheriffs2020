@@ -1,5 +1,3 @@
-import math
-
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -21,12 +19,10 @@ app.title = "Sheriffs for Trusting Communities"
 with open("data/merged_data.pkl", "rb") as fh:
     df = pickle.load(fh)
 
-states_21 = [i for i in df[df.has_election_2021].state_name.unique()]
 usecols = [
+    "statecode",
     "State",
     "Electoral District",
-    "county_fips",
-    "statecode",
     "Office Name",
     "Official Name",
     "Party Roll Up",
@@ -52,17 +48,26 @@ app.layout = html.Div(
                     value="Nationwide",
                     placeholder="Nationwide",
                     multi=True,
-                    style=dict(width="200px"),
+                    style=dict(width="400px"),
                 ),
             ]
         ),
         dcc.Graph(id="bubble_chart", figure=make_fig(df)),
+        # TODO: fix styling to change the names of the columns
         dash_table.DataTable(
             id="table",
             columns=[{"name": i, "id": i} for i in df[usecols]],
             data=df.to_dict("records"),
             sort_action="native",
             filter_action="native",
+            style_cell={"textAlign": "left"},
+            style_as_list_view=True,
+            style_cell_conditional=[
+                {
+                    "if": {"column_id": "per_dem", "column_id": "CAP Local/All"},
+                    "textAlign": "right",
+                }
+            ],
         ),
     ]
 )
