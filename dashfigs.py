@@ -63,7 +63,7 @@ def make_table_columns(df):
             "id": "Office Name",
             "name": "Office",
             "type": "text",
-            "format": {"specifier": ":.15"},
+            "format": {"specifier": ":.15s"},
             "hideable": True,
         },
         {"id": "Official Name", "name": "Sherriff Name", "type": "text"},
@@ -79,24 +79,28 @@ def make_table_columns(df):
             "name": "CAP Local/All",
             "type": "numeric",
             "format": FormatTemplate.percentage(2),
+            "hideable": True,
         },
         {
             "id": "Detainers Total",
             "name": "Detainers Total",
             "type": "numeric",
             "format": {"specifier": ",.0f"},
+            "hideable": True,
         },
         {
             "id": "Deaths_per_thousand_pop",
             "name": "Deaths per 1k jailed pop",
             "type": "numeric",
             "format": {"specifier": ".1f"},
+            "hideable": True,
         },
         {
             "id": "killings_per_k_arrests",
             "name": "Killings per 1k arrests",
             "type": "numeric",
             "format": {"specifier": ",.1f"},
+            "hideable": True,
         },
     ]
 
