@@ -6,13 +6,47 @@ import plotly.express as px
 import dash_table.FormatTemplate as FormatTemplate
 
 import pandas as pd
+import numpy as np
 
 
 # df = pd.read_pickle("data/merged_data.pkl")
+def yaxis_cols():
+    return [
+        {"label": l, "value": v}
+        for l, v in [
+            ("CAP Local/All Immigration Arrests", "CAP Local/All"),
+            ("Total Detainers", "Detainers Total"),
+            (
+                "Deaths per Thousand Jailed Population",
+                "Deaths_per_thousand_pop",
+            ),
+            (
+                "Police Killings per Thousand Arrests",
+                "killings_per_k_arrests",
+            ),
+        ]
+    ]
 
 
-def make_bubble_chart_fig(df, yaxis):
-    df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
+def set_table_style_cell_conditional():
+    return [
+        {
+            "if": {"column_id": c},
+            "textAlign": "right",
+        }
+        for c in [
+            "per_dem",
+            "CAP Local/All",
+            "Detainers Total",
+            "Deaths_per_thousand_pop",
+            "killings_per_k_arrests",
+        ]
+    ]
+
+
+def make_bubble_chart_fig(df, year, yaxis):
+    df.loc[:, "votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
+    df = df[df[f"has_election_{year}"]]
     fig = px.scatter(
         df,
         x="per_dem",

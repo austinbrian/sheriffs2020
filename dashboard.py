@@ -7,7 +7,13 @@ import plotly.express as px
 import pickle5 as pickle
 from dash.dependencies import Input, Output, State
 
-from dashfigs import make_bubble_chart_fig, make_table_columns
+from dashfigs import (
+    make_bubble_chart_fig,
+    make_table_columns,
+    set_table_style_cell_conditional,
+    yaxis_cols,
+)
+from combine import create_combined_metrics
 
 #### Initialize app
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
@@ -27,7 +33,7 @@ app.layout = html.Div(
             children=[
                 html.P(
                     "Select geography and election year below",
-                    style={"font-style": "italic"},
+                    style={"font-weight": "bold", "font-size": 16},
                 ),
                 dcc.Dropdown(
                     id="state_dropdown",
@@ -39,43 +45,57 @@ app.layout = html.Div(
                 ),
                 dcc.RadioItems(
                     id="year_dropdown",
-                    options=[{"label": i, "value": i} for i in [2021, 2022]],
+                    options=[{"label": i, "value": i} for i in ["2021", "2022"]],
                     value="2022",
-                    labelStyle={"display": "inline-block", "font-style": "bold"},
+                    labelStyle={"display": "inline-block"},
                     style={
-                        "padding": "20px",
+                        "padding": "10px 20px",
                         "max-width": "120px",
                         "display": "flex",
                         "justify-content": "space-between",
                     },
                 ),
-            ]
-        ),
-        html.Div(
-            children=[
-                html.P("Select y-axis", style={"font-style": "italic"}),
-                dcc.Dropdown(
-                    id="yaxis-column",
+                html.P("Select y-axis", style={"font-weight": "bold", "font-size": 16}),
+                dcc.RadioItems(
+                    id="mult_or_single_yaxis",
                     options=[
                         {"label": l, "value": v}
-                        for l, v in [
-                            ("CAP Local/All", "CAP Local/All"),
-                            ("Total Detainers", "Detainers Total"),
-                            (
-                                "Deaths per Thousand Jailed Population",
-                                "Deaths_per_thousand_pop",
-                            ),
-                            (
-                                "Police Killings per Thousand Arrests",
-                                "killings_per_k_arrests",
-                            ),
-                        ]
+                        for l, v in zip(
+                            ["Single Y-Axis", "Multiple Y-Axes"],
+                            ["single", "multiple"],
+                        )
                     ],
+                    value="single",
+                    labelStyle={
+                        "display": "inline-block",
+                        "font-style": "bold",
+                    },
+                    style={
+                        "padding": "10px 20px",
+                        "max-width": "300px",
+                        "display": "flex",
+                        "justify-content": "space-between",
+                    },
+                ),
+                html.P(
+                    id="explain-mult",
+                    children="",
+                    style={
+                        "font-style": "italic",
+                        "font-size": 12,
+                        "max-width": "600px",
+                    },
+                ),
+                dcc.Dropdown(
+                    id="yaxis-column",
+                    options=yaxis_cols(),
                     value="CAP Local/All",
-                    style=dict(width="400px"),
+                    multi=True,
+                    style=dict(width="600px"),
                 ),
                 dcc.Graph(
-                    id="bubble_chart", figure=make_bubble_chart_fig(df, "CAP Local/All")
+                    id="bubble_chart",
+                    figure=make_bubble_chart_fig(df, "2022", "CAP Local/All"),
                 ),
                 html.P(
                     "The table below can be filtered using the filter row, and some columns can be toggled on or off.",
@@ -89,24 +109,33 @@ app.layout = html.Div(
                     filter_action="native",
                     style_cell={"textAlign": "left"},
                     style_as_list_view=True,
-                    style_cell_conditional=[
-                        {
-                            "if": {"column_id": c},
-                            "textAlign": "right",
-                        }
-                        for c in [
-                            "per_dem",
-                            "CAP Local/All",
-                            "Detainers Total",
-                            "Deaths_per_thousand_pop",
-                            "killings_per_k_arrests",
-                        ]
-                    ],
+                    style_cell_conditional=set_table_style_cell_conditional(),
                 ),
             ]
         ),
     ]
 )
+
+
+@app.callback(Output("yaxis-column", "multi"), [Input("mult_or_single_yaxis", "value")])
+def select_multiple_or_single_yaxis(value):
+    if value == "single":
+        return False
+    elif value == "multiple":
+        return True
+
+
+@app.callback(Output("yaxis-column", "value"), [Input("mult_or_single_yaxis", "value")])
+def reset_yaxis_col_if_switched(value):
+    return "CAP Local/All"
+
+
+@app.callback(
+    Output("explain-mult", "children"), [Input("mult_or_single_yaxis", "value")]
+)
+def print_explain_mult_value(value):
+    if value == "multiple":
+        return "If multiple items are selected, the values of the relevant axes are scaled using the number of standard deviations away from the mean each county is for that axis item. Then the scores for each county are added together and set at a minimum of zero."
 
 
 @app.callback(
@@ -122,11 +151,30 @@ def update_bubble_chart(year, state, yaxis):
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
         if isinstance(state, list):
-            state = state
+            if len(state) > 0:
+                state = state
+            else:
+                state = df[df[f"has_election_{year}"]].State.unique()
         else:
             state = [state]
-    df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
-    fig = make_bubble_chart_fig(df2, yaxis)
+    df2 = df[df.State.isin(state)]
+    if isinstance(yaxis, list):
+        if len(yaxis) == 0:
+            fig = make_bubble_chart_fig(df2, year, yaxis)
+            fig.update_layout(title="No axis selected")
+        elif len(yaxis) == 1:
+            fig = make_bubble_chart_fig(df2, year, yaxis)
+            fig.update_layout(title=f"{yaxis[0]} vs. Dem Performance")
+        else:
+            df3 = create_combined_metrics(df2, *yaxis)
+            fig = make_bubble_chart_fig(df3, year, "combined_metric")
+            fig.update_layout(
+                title=f"{', '.join(yaxis)} Combined vs. Dem Performance",
+                yaxis_title="Combined Metric Score",
+            )
+    else:
+        fig = make_bubble_chart_fig(df2, year, yaxis)
+        fig.update_layout(title=f"{yaxis} vs. Dem Performance")
     return fig
 
 
@@ -138,7 +186,7 @@ def update_state_dropdown_on_year_select(year):
 
 
 @app.callback(Output("state_dropdown", "value"), [Input("state_dropdown", "options")])
-def reset_states_to_nationwide_on_year_switch(value):
+def reset_states_to_nationwide_on_year_switch(options):
     return "Nationwide"
 
 
@@ -154,7 +202,10 @@ def update_table(year, state):
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
         if isinstance(state, list):
-            state = state
+            if len(state) > 0:
+                state = state
+            else:
+                state = df[df[f"has_election_{year}"]].State.unique()
         else:
             state = [state]
     df2 = df[df[f"has_election_{year}"] & (df.State.isin(state))]
