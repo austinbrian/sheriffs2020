@@ -44,16 +44,25 @@ def set_table_style_cell_conditional():
     ]
 
 
+party_colors = dict(
+    zip(
+        ["Independent", "Unknown", "Democratic Party", "Republican Party"],
+        ["green", "gray", "blue", "red"],
+    )
+)
+
+
 def make_bubble_chart_fig(df, year, yaxis):
     df.loc[:, "votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
+    df["Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
     df = df[df[f"has_election_{year}"]]
     fig = px.scatter(
         df,
         x="per_dem",
         y=yaxis,
         size="votesize",
-        color="per_dem",
-        color_continuous_scale=px.colors.sequential.RdBu,
+        color="Party Roll Up",
+        color_discrete_map=party_colors,
         hover_name="Electoral District",
         hover_data={
             "State": True,
