@@ -450,11 +450,13 @@ def merge_data():
 
     # limit to just 2016 or later and only county facilities
     md = md[(md.Year >= 2016) & (md["Facility Type"] == "County Facility")]
+    md["county_lower"] = md.County.str.lower()
+    df["county_lower"] = df.county_name.str.lower()
     md["Detainers Total"] = md.County.map(md.groupby("County")["Total"].sum().to_dict())
     df = df.merge(
-        md[["State", "County", "Detainers Total"]],
-        left_on=["state_name", "county_name"],
-        right_on=["State", "County"],
+        md[["State", "county_lower", "Detainers Total"]],
+        left_on=["state_name", "county_lower"],
+        right_on=["State", "county_lower"],
     )
     # money column: cap local / total detainers
     df["CAP Local/Detainers"] = df["CAPLocal_1619"] / df["Detainers Total"]
@@ -488,7 +490,6 @@ def merge_data():
         gnsd.set_index("fips")["low_level_per_arrest"].to_dict()
     )
 
-    df.drop(["County_x", "County_y"], axis=1, inplace=True)
     return df.drop_duplicates()
 
 
@@ -496,7 +497,20 @@ def wholeads_data(group: str = "electeds"):
     url = "https://wholeads.us/wp-content/uploads/2020/06/Sheriffs-Report-Data.xlsx"
 
     def get_electeds():
-        electeds = pd.read_excel(url, sheet_name="Electeds Raw")
+        who = pd.read_excel(url, sheet_name="Electeds Raw")
+        who["mult_jurisdictions"] = who["Electoral District"].str.split(" & ")
+        who["num_jurisdictions"] = who.mult_jurisdictions.apply(lambda x: len(x))
+        who["adj_county"] = who["Electoral District"].copy()
+
+        # duplicates the multi-jurisdictions
+        mdf = who.loc[np.repeat(who.index.values, who.num_jurisdictions.astype(int))][
+            who.num_jurisdictions > 1
+        ]
+        s = mdf.mult_jurisdictions.values.tolist()
+        l = list(flatten(s))
+        mdf.adj_county = sorted(set(l), key=l.index)
+        electeds = pd.concat([who.drop(who[who.num_jurisdictions > 1].index), mdf])
+        electeds["county_lower"] = electeds.adj_county.str.lower()
         return electeds
 
     def get_candidates():
@@ -536,6 +550,7 @@ def wholeads_data(group: str = "electeds"):
 
 if __name__ == "__main__":
     who = wholeads_data("electeds")
+    who["county_lower"]
     merge_data().merge(
         who.rename({"State": "statecode"}, axis=1).drop("Total", axis=1),
         left_on=["statecode", "county_name"],

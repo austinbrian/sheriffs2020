@@ -28,7 +28,7 @@ with open("data/merged_data.pkl", "rb") as fh:
 
 app.layout = html.Div(
     [
-        html.H1("Sheriffs on the Bubble"),
+        html.H1("Sheriffs For Trusting Communities Election Dashboard"),
         html.Div(
             children=[
                 html.P(
@@ -54,6 +54,11 @@ app.layout = html.Div(
                         "display": "flex",
                         "justify-content": "space-between",
                     },
+                ),
+                html.P(
+                    children=f"This selection has {len(df):,} counties.",
+                    id="geography-counter",
+                    style={"font-style": "italic", "font-size": 14},
                 ),
                 html.P("Select y-axis", style={"font-weight": "bold", "font-size": 16}),
                 dcc.RadioItems(
@@ -111,6 +116,15 @@ app.layout = html.Div(
                     style_as_list_view=True,
                     style_cell_conditional=set_table_style_cell_conditional(),
                 ),
+                html.Div(
+                    id="sources",
+                    children=[
+                        html.P(
+                            "This data is provided by Sheriffs for Trusting Communities © 2021"
+                        )
+                    ],
+                    style={"font-style": "italic"},
+                ),
             ]
         ),
     ]
@@ -139,6 +153,28 @@ def print_explain_mult_value(value):
 
 
 @app.callback(
+    Output("geography-counter", "children"),
+    [
+        Input("year_dropdown", "value"),
+        Input("state_dropdown", "value"),
+    ],
+)
+def count_geography(year, state):
+    if state == "Nationwide":
+        state = df[df[f"has_election_{year}"]].State.unique()
+    else:
+        if isinstance(state, list):
+            if len(state) > 0:
+                state = state
+            else:
+                state = df[df[f"has_election_{year}"]].State.unique()
+        else:
+            state = [state]
+    df2 = df[(df.State.isin(state)) & (df[f"has_election_{year}"])]
+    return f"This selection has {len(df2):,} counties."
+
+
+@app.callback(
     Output("bubble_chart", "figure"),
     [
         Input("year_dropdown", "value"),
@@ -164,17 +200,17 @@ def update_bubble_chart(year, state, yaxis):
             fig.update_layout(title="No axis selected")
         elif len(yaxis) == 1:
             fig = make_bubble_chart_fig(df2, year, yaxis)
-            fig.update_layout(title=f"{yaxis[0]} vs. Dem Performance")
+            fig.update_layout(title=f"{yaxis[0]} vs. Dem 2020 Performance")
         else:
             df3 = create_combined_metrics(df2, *yaxis)
             fig = make_bubble_chart_fig(df3, year, "combined_metric")
             fig.update_layout(
-                title=f"{', '.join(yaxis)} Combined vs. Dem Performance",
+                title=f"{', '.join(yaxis)} Combined vs. Dem 2020 Performance",
                 yaxis_title="Combined Metric Score",
             )
     else:
         fig = make_bubble_chart_fig(df2, year, yaxis)
-        fig.update_layout(title=f"{yaxis} vs. Dem Performance")
+        fig.update_layout(title=f"{yaxis} vs. Dem 2020 Performance")
     return fig
 
 

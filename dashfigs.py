@@ -1,4 +1,5 @@
 import sys
+from collections import OrderedDict
 
 sys.path.append("..")
 import plotly.graph_objects as go
@@ -14,16 +15,16 @@ def yaxis_cols():
     return [
         {"label": l, "value": v}
         for l, v in [
-            ("CAP Local/All Immigration Arrests", "CAP Local/All"),
-            ("Total Detainers", "Detainers Total"),
+            ("Immigration Enforcement", "CAP Local/All"),
             (
-                "Deaths per Thousand Jailed Population",
+                "Deaths in Jail",
                 "Deaths_per_thousand_pop",
             ),
             (
-                "Police Killings per Thousand Arrests",
+                "Deputy Killings",
                 "killings_per_k_arrests",
             ),
+            ("Total Nonwhite %", "Total Nonwhite %"),
         ]
     ]
 
@@ -53,9 +54,9 @@ party_colors = dict(
 
 
 def make_bubble_chart_fig(df, year, yaxis):
-    df.loc[:, "votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
-    df["Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
+    df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     df = df[df[f"has_election_{year}"]]
+    df["Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
     fig = px.scatter(
         df,
         x="per_dem",
@@ -64,20 +65,22 @@ def make_bubble_chart_fig(df, year, yaxis):
         color="Party Roll Up",
         color_discrete_map=party_colors,
         hover_name="Electoral District",
-        hover_data={
-            "State": True,
-            "per_dem": ":.2%",
-            "CAP Local/All": ":0.2f",
-            "votesize": False,
-            "total_votes": ":,f",
-            "Official Name": True,
-            "Party Roll Up": True,
-        },
+        hover_data=OrderedDict(
+            {
+                "State": True,
+                "per_dem": ":.2%",
+                "CAP Local/All": ":0.2f",
+                "votesize": False,
+                "total_votes": ":,f",
+                "Official Name": True,
+                "Party Roll Up": True,
+            }
+        ),
         labels={
-            "per_dem": "Dem %",
+            "per_dem": "Dem % 2020",
             "total_votes": "2020 Total Votes",
             "Official Name": "Sheriff Name",
-            "Party Roll Up": "Party",
+            "Party Roll Up": "Sheriff Party",
         },
     )
 
@@ -121,7 +124,7 @@ def make_table_columns(df):
             "id": "CAP Local/All",
             "name": "CAP Local/All",
             "type": "numeric",
-            "format": FormatTemplate.percentage(2),
+            "format": {"locale": {}, "nully": "", "specifier": ".2%"},
             "hideable": True,
         },
         {
