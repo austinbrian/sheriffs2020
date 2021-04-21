@@ -7,13 +7,15 @@ import plotly.express as px
 import pickle5 as pickle
 from dash.dependencies import Input, Output, State
 
-from dashfigs import (
+from components.dashfigs import (
     make_bubble_chart_fig,
     make_table_columns,
     set_table_style_cell_conditional,
     yaxis_cols,
+    xaxis_cols,
 )
 from combine import create_combined_metrics
+from components import YDiv, XDiv
 
 #### Initialize app
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
@@ -25,6 +27,8 @@ app.title = "Sheriffs for Trusting Communities"
 with open("data/merged_data.pkl", "rb") as fh:
     df = pickle.load(fh)
 
+with open("data/elections_2018/attempt_2.pkl", "rb") as fh:
+    e18 = pickle.load(fh)
 
 app.layout = html.Div(
     [
@@ -60,47 +64,15 @@ app.layout = html.Div(
                     id="geography-counter",
                     style={"font-style": "italic", "font-size": 14},
                 ),
-                html.P("Select y-axis", style={"font-weight": "bold", "font-size": 16}),
-                dcc.RadioItems(
-                    id="mult_or_single_yaxis",
-                    options=[
-                        {"label": l, "value": v}
-                        for l, v in zip(
-                            ["Single Y-Axis", "Multiple Y-Axes"],
-                            ["single", "multiple"],
-                        )
-                    ],
-                    value="single",
-                    labelStyle={
-                        "display": "inline-block",
-                        "font-style": "bold",
-                    },
-                    style={
-                        "padding": "10px 20px",
-                        "max-width": "300px",
-                        "display": "flex",
-                        "justify-content": "space-between",
-                    },
-                ),
-                html.P(
-                    id="explain-mult",
-                    children="",
-                    style={
-                        "font-style": "italic",
-                        "font-size": 12,
-                        "max-width": "600px",
-                    },
-                ),
-                dcc.Dropdown(
-                    id="yaxis-column",
-                    options=yaxis_cols(),
-                    value="CAP Local/All",
-                    multi=True,
-                    style=dict(width="600px"),
+                html.Div(
+                    [YDiv(), XDiv()],
+                    style={"display": "flex", "width": "95%"},
                 ),
                 dcc.Graph(
                     id="bubble_chart",
-                    figure=make_bubble_chart_fig(df, "2022", "CAP Local/All"),
+                    figure=make_bubble_chart_fig(
+                        df, "2022", "CAP Local/All", "Dem % 2020"
+                    ),
                 ),
                 html.P(
                     "The table below can be filtered using the filter row, and some columns can be toggled on or off.",
@@ -127,7 +99,8 @@ app.layout = html.Div(
                 ),
             ]
         ),
-    ]
+    ],
+    style={"padding": "20px", "margin-bottom": "25px"},
 )
 
 
@@ -150,6 +123,14 @@ def reset_yaxis_col_if_switched(value):
 def print_explain_mult_value(value):
     if value == "multiple":
         return "If multiple items are selected, the values of the relevant axes are scaled using the number of standard deviations away from the mean each county is for that axis item. Then the scores for each county are added together and set at a minimum of zero."
+
+
+@app.callback(Output("explain-x-axis", "children"), [Input("xaxis-column", "value")])
+def print_explain_mult_value_xaxis(value):
+    if isinstance(value, list):
+        return "If multiple years are selected, the X-axis shows the average Democratic performance for a county"
+    else:
+        return ""
 
 
 @app.callback(
@@ -180,9 +161,10 @@ def count_geography(year, state):
         Input("year_dropdown", "value"),
         Input("state_dropdown", "value"),
         Input("yaxis-column", "value"),
+        Input("xaxis-column", "value"),
     ],
 )
-def update_bubble_chart(year, state, yaxis):
+def update_bubble_chart(year, state, yaxis, xaxis):
     if state == "Nationwide":
         state = df[df[f"has_election_{year}"]].State.unique()
     else:
@@ -199,7 +181,7 @@ def update_bubble_chart(year, state, yaxis):
             fig = make_bubble_chart_fig(df2, year, yaxis)
             fig.update_layout(title="No axis selected")
         elif len(yaxis) == 1:
-            fig = make_bubble_chart_fig(df2, year, yaxis)
+            fig = make_bubble_chart_fig(df2, year, yaxis, xaxis)
             fig.update_layout(title=f"{yaxis[0]} vs. Dem 2020 Performance")
         else:
             df3 = create_combined_metrics(df2, *yaxis)
@@ -209,7 +191,7 @@ def update_bubble_chart(year, state, yaxis):
                 yaxis_title="Combined Metric Score",
             )
     else:
-        fig = make_bubble_chart_fig(df2, year, yaxis)
+        fig = make_bubble_chart_fig(df2, year, yaxis, xaxis)
         fig.update_layout(title=f"{yaxis} vs. Dem 2020 Performance")
     return fig
 
