@@ -32,7 +32,7 @@ with open("data/elections_2018/attempt_2.pkl", "rb") as fh:
 
 app.layout = html.Div(
     [
-        html.H1("Sheriffs For Trusting Communities Election Dashboard"),
+        html.H1("Sheriffs for Trusting Communities Election Dashboard"),
         html.Div(
             children=[
                 html.P(
@@ -206,6 +206,15 @@ def update_state_dropdown_on_year_select(year):
 @app.callback(Output("state_dropdown", "value"), [Input("state_dropdown", "options")])
 def reset_states_to_nationwide_on_year_switch(options):
     return "Nationwide"
+
+
+@app.callback(Output("xaxis-checkboxes", "options"), [Input("xaxis-column", "value")])
+def change_checkbox_options_on_year_switch(value):
+
+    options = XDiv.checkbox_options
+    if value == "per_dem":
+
+        return options
 
 
 @app.callback(
