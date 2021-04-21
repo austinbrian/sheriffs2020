@@ -12,6 +12,72 @@ def get_state_df(state, jurisdiction="precinct"):
     return stdf
 
 
+def process_party_names(stdf):
+    xf = (
+        stdf.groupby(["county", "office", "party"])["votes"]
+        .sum()
+        .unstack()
+        .reset_index()
+    )
+    xf["tot_vot"] = xf.sum(axis=1, numeric_only=True)
+    # xf["state"] = state
+    dem_names = [
+        "DEM",
+        "Dem",
+        "Democtratic",
+        "DemocraticOCRATIC",
+        "Democratic",
+        "Democratic Party",
+        "DFL",
+        "WFP",
+        "Working Families",
+        "WOR",
+        "Women's Equality",
+        "Women's Equality Party",
+    ]
+    rep_names = [
+        "REP",
+        "Republican",
+        "Rep",
+        "Republican Party",
+        "GOP",
+        "GOP.",
+        "R",
+    ]
+    other_names = [
+        x
+        for x in filter(
+            lambda y: y not in ["party", "county", "office", "state"], xf.columns
+        )
+        if x not in dem_names + rep_names
+    ]
+    xf["D_r"] = (
+        xf[filter(lambda x: x in dem_names, xf.columns)].astype(float).sum(axis=1)
+    )
+    xf["R_r"] = (
+        xf[filter(lambda x: x in rep_names, xf.columns)]
+        .astype(float)
+        .sum(
+            axis=1,
+        )
+    )
+    # xf["O_r"] = (
+    #     xf[filter(lambda x: x in other_names, xf.columns)].astype(float).sum(axis=1)
+    # )
+    xf["O_r"] = xf["tot_vot"] - xf["D_r"] - xf["R_r"]
+    xfg = xf[
+        filter(
+            lambda x: x
+            in ["party", "county", "office", "tot_vot", "D_r", "R_r", "O_r"],
+            xf.columns,
+        )
+    ].copy()
+
+    xfg.rename({"D_r": "DEM", "R_r": "REP", "O_r": "OTH"}, axis=1, inplace=True)
+    xfg.loc[:, "Dem%"] = xfg["DEM"] / xfg["tot_vot"]
+    return xfg
+
+
 def calc_perf_2018(n=3):
     full_df = pd.DataFrame()
     # md = merge_data()
@@ -25,6 +91,16 @@ def calc_perf_2018(n=3):
         lambda x: " ".join(x.split()[:-1]) if "county" in x.lower() else x
     )
     for state in states_22[:n]:
+        if state in ["NH", "NV"]:
+            if state == "NH":
+                xf = new_hampshire_18()
+            elif state == "NV":
+                xf = nevada_18()
+            df = counties[counties.ST == state].copy()
+            df = df.merge(xf, left_on="simple_county", right_on="county")
+            full_df = pd.concat([full_df, df])
+            print("Wrote", state)
+            continue
         try:
             stdf = get_state_df(state, "county")
         except:
@@ -57,16 +133,15 @@ def calc_perf_2018(n=3):
         df["rec_ballots_18"] = df["simple_county"].map(ballots_dict)
 
         # other stuff
-
-        try:
-
-            partycols = (
-                stdf.groupby(["county", "party"])["votes"].sum().unstack().reset_index()
+        stdf = stdf[
+            stdf.office.isin(
+                ["U.S. Senate", "Governor", "Lieutenant Governor", "Attorney General"]
             )
-            df = df.merge(partycols, left_on="simple_county", right_on="county")
+        ]
+        xf = process_party_names(stdf)
+        xf["state"] = state
 
-        except:
-            continue
+        df = df.merge(xf, left_on="simple_county", right_on="county")
 
         full_df = pd.concat([full_df, df])
 
@@ -91,9 +166,35 @@ def nevada_18():
     nvg["tot_vot"] = NV.groupby(["county", "office"])["votes"].sum()
     nvg["Dem%"] = nvg["DEM"] / nvg["tot_vot"]
     # return nvg.groupby("county")["Dem%"].mean()
-    return nvg
+    nvg["state"] = "NV"
+    return nvg.reset_index()
+
+
+def new_hampshire_18():
+    nh = get_state_df("NH")
+    nh = nh.dropna(subset=["votes"])
+    nh = nh.drop(nh[nh.votes == " "].index)
+    nh["votes"] = nh.votes.apply(lambda x: x.strip()).astype(int)
+    nhg = (
+        nh[nh.county.str.contains(" NH")]
+        .groupby(["office", "county", "party"])["votes"]
+        .sum()
+        .unstack()
+        .reset_index()
+    )
+    nhg["tot_vot"] = nhg["county"].map(
+        nh[nh.county.str.contains(" NH")].groupby("county")["votes"].sum().to_dict()
+    )
+    nhg["county"] = nhg.county.str.strip(" NH")
+    nhg.rename({"LBT": "OTH"}, axis=1, inplace=True)
+    nhg["Dem%"] = nhg["DEM"] / nhg["tot_vot"]
+    nhg["state"] = "NH"
+    return nhg
 
 
 if __name__ == "__main__":
     xf = calc_perf_2018(n=100)
-    xf.to_pickle("data/elections_2018/attempt_1.pkl")
+    xf.to_pickle("data/elections_2018/attempt_2.pkl")
+    # nh = new_hampshire_18()
+    # nv = nevada_18()
+    # pd.concat([xf, nh, nv]).to_pickle("data/elections_2018/attempt_2.pkl")
