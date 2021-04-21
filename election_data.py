@@ -134,8 +134,8 @@ def calc_perf_2018(n=3):
 
         # other stuff
         stdf = stdf[
-            stdf.office.isin(
-                ["U.S. Senate", "Governor", "Lieutenant Governor", "Attorney General"]
+            stdf.office.str.upper().isin(
+                ["U.S. SENATE", "GOVERNOR", "LIEUTENANT GOVERNOR", "ATTORNEY GENERAL"]
             )
         ]
         xf = process_party_names(stdf)
@@ -185,7 +185,7 @@ def new_hampshire_18():
     nhg["tot_vot"] = nhg["county"].map(
         nh[nh.county.str.contains(" NH")].groupby("county")["votes"].sum().to_dict()
     )
-    nhg["county"] = nhg.county.str.strip(" NH")
+    nhg["county"] = nhg.county.str.rstrip(" NH")
     nhg.rename({"LBT": "OTH"}, axis=1, inplace=True)
     nhg["Dem%"] = nhg["DEM"] / nhg["tot_vot"]
     nhg["state"] = "NH"
@@ -194,7 +194,7 @@ def new_hampshire_18():
 
 if __name__ == "__main__":
     xf = calc_perf_2018(n=100)
-    xf.to_pickle("data/elections_2018/attempt_2.pkl")
+    xf.to_pickle("data/elections_2018/attempt_3.pkl")
     # nh = new_hampshire_18()
     # nv = nevada_18()
     # pd.concat([xf, nh, nv]).to_pickle("data/elections_2018/attempt_2.pkl")
