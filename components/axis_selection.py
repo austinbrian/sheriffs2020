@@ -4,6 +4,34 @@ from .dashfigs import yaxis_cols, xaxis_cols
 
 
 class XDiv:
+    checkbox_options = [
+        {
+            "label": "President",
+            "value": "pres",
+            "disabled": True,
+        },
+        {
+            "label": "US Senate",
+            "value": "sen",
+            "disabled": False,
+        },
+        {
+            "label": "Governor",
+            "value": "gov",
+            "disabled": False,
+        },
+        {
+            "label": "Lt. Governor",
+            "value": "ltgov",
+            "disabled": False,
+        },
+        {
+            "label": "Attorney General",
+            "value": "ag",
+            "disabled": False,
+        },
+    ]
+
     def __new__(cls):
         return html.Div(
             children=[
@@ -11,48 +39,34 @@ class XDiv:
                     "Select x-axis",
                     style={"font-weight": "bold", "font-size": 16},
                 ),
-                dcc.Dropdown(
+                dcc.RadioItems(
                     id="xaxis-column",
                     options=xaxis_cols(),
-                    value="Dem % 2020",
-                    multi=True,
+                    value="per_dem",
+                    labelStyle={
+                        "display": "inline-block",
+                        "font-style": "bold",
+                    },
+                    style={
+                        "padding": "5px 20px",
+                        "max-width": "250px",
+                        "display": "flex",
+                        "justify-content": "space-between",
+                    },
+                    # placeholder="Dem % 2020",
+                    # multi=True,
                     # style=dict(width="600px"),
                 ),
                 dcc.Checklist(
                     id="xaxis-checkboxes",
-                    options=[
-                        {
-                            "label": "President",
-                            "value": "pres",
-                            "disabled": True,
-                        },
-                        {
-                            "label": "US Senate",
-                            "value": "sen",
-                            "disabled": False,
-                        },
-                        {
-                            "label": "Governor",
-                            "value": "gov",
-                            "disabled": False,
-                        },
-                        {
-                            "label": "Lt. Governor",
-                            "value": "ltgov",
-                            "disabled": False,
-                        },
-                        {
-                            "label": "Attorney General",
-                            "value": "ag",
-                            "disabled": False,
-                        },
-                    ],
-                    labelStyle={"display": "flex"},
+                    options=cls.checkbox_options,
+                    value=["sen", "gov", "ltgov", "ag"],
+                    # labelStyle={"display": "flex"},
                     style={
                         "padding": "5px",
                         "margin": "2%",
-                        "display": "flex",
-                        "justify-content": "space-between",
+                        # "display": "flex",
+                        # "justify-content": "space-between",
                     },
                 ),
                 html.P(
