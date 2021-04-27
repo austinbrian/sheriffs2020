@@ -90,14 +90,18 @@ def calc_perf_2018(n=3):
     counties["simple_county"] = counties.CTYNAME.apply(
         lambda x: " ".join(x.split()[:-1]) if "county" in x.lower() else x
     )
+    counties["lower_county"] = counties.simple_county.str.lower()
     for state in states_22[:n]:
-        if state in ["NH", "NV"]:
+        if state in ["NH", "NV", "NC"]:
             if state == "NH":
                 xf = new_hampshire_18()
             elif state == "NV":
                 xf = nevada_18()
+            elif state == "NC":
+                xf = north_carolina_18()
+            xf["lower_county"] = xf.county.str.lower()
             df = counties[counties.ST == state].copy()
-            df = df.merge(xf, left_on="simple_county", right_on="county")
+            df = df.merge(xf, on="lower_county", how="left")
             full_df = pd.concat([full_df, df])
             print("Wrote", state)
             continue
@@ -135,7 +139,15 @@ def calc_perf_2018(n=3):
         # other stuff
         stdf = stdf[
             stdf.office.str.upper().isin(
-                ["U.S. SENATE", "GOVERNOR", "LIEUTENANT GOVERNOR", "ATTORNEY GENERAL"]
+                [
+                    "U.S. SENATE",
+                    "GOVERNOR",
+                    "LIEUTENANT GOVERNOR",
+                    "ATTORNEY GENERAL",
+                    "U.S. HOUSE",
+                    "U.S. HOUSE OF REPRESENTATIVES",
+                    "US HOUSE OF REPRESENTATIVES",
+                ]
             )
         ]
         xf = process_party_names(stdf)
@@ -192,9 +204,18 @@ def new_hampshire_18():
     return nhg
 
 
+def north_carolina_18():
+    nc = pd.read_csv(
+        "https://github.com/openelections/openelections-results-nc/blob/master/raw/20181106__nc__general__precinct__raw.csv?raw=true"
+    )
+    ncg = process_party_names(nc.rename({"parent_jurisdiction": "county"}, axis=1))
+    ncg["state"] = "NC"
+    return ncg
+
+
 if __name__ == "__main__":
     xf = calc_perf_2018(n=100)
-    xf.to_pickle("data/elections_2018/attempt_3.pkl")
+    xf.to_pickle("data/elections_2018/attempt_4.pkl")
     # nh = new_hampshire_18()
     # nv = nevada_18()
     # pd.concat([xf, nh, nv]).to_pickle("data/elections_2018/attempt_2.pkl")
