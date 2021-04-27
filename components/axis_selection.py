@@ -39,25 +39,32 @@ class XDiv:
                     "Select x-axis",
                     style={"font-weight": "bold", "font-size": 16},
                 ),
-                dcc.Checklist(
-                    id="xaxis-checkboxes",
-                    options=cls.checkbox_options,
-                    value=["sen", "gov", "ltgov", "ag"],
-                    # labelStyle={"display": "flex"},
-                    style={
-                        "padding": "5px",
-                        "margin": "2%",
-                        # "display": "flex",
-                        # "justify-content": "space-between",
-                    },
-                ),
-                html.P(
-                    id="explain-x-axis",
-                    children="",
-                    style={
-                        "font-style": "italic",
-                        "font-size": 12,
-                    },
+                html.Div(
+                    [
+                        dcc.Checklist(
+                            id="xaxis-checkboxes",
+                            options=cls.checkbox_options,
+                            value=["pres", "sen", "gov", "ltgov", "ag"],
+                            # labelStyle={"display": "flex"},
+                            style={
+                                "padding": "5px",
+                                "margin": "1%",
+                                # "display": "flex",
+                                # "justify-content": "space-between",
+                            },
+                        ),
+                        html.P(
+                            id="explain-x-axis",
+                            children="",
+                            style={
+                                "font-style": "italic",
+                                "font-size": 12,
+                                "max-width": "150px",
+                                "font-weight": "300",
+                            },
+                        ),
+                    ],
+                    style={"display": "flex"},
                 ),
             ],
             id="xdiv",
@@ -112,7 +119,7 @@ class YDiv:
                     options=yaxis_cols(),
                     value="CAP Local/All",
                     multi=True,
-                    # style=dict(width="35%"),
+                    style=dict(width="90%"),
                 ),
             ],
             style={

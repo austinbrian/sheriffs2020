@@ -24,11 +24,24 @@ server = app.server
 app.title = "Sheriffs for Trusting Communities"
 
 #### Get data
-with open("data/merged_data.pkl", "rb") as fh:
+with open("data/merged_data_sheriffs.pkl", "rb") as fh:
     df = pickle.load(fh)
 
-with open("data/elections_2018/attempt_2.pkl", "rb") as fh:
-    e18 = pickle.load(fh)
+with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
+    e18 = pickle.load(fh).reset_index(drop=True)
+    e18["pres"] = e18.FIPS.map(df.set_index("county_fips")["per_dem"].to_dict())
+    e18["gov"] = e18.loc[e18[e18.office == "Governor"].index, "Dem%"]
+    e18["sen"] = e18.loc[e18[e18.office == "U.S. Senate"].index, "Dem%"]
+    e18["ltgov"] = e18.loc[e18[e18.office == "Lieutenant Governor"].index, "Dem%"]
+    e18["ag"] = e18.loc[e18[e18.office.str.lower() == "attorney general"].index, "Dem%"]
+    egr = (
+        e18[["FIPS", "pres", "gov", "sen", "ltgov", "ag"]]
+        .groupby("FIPS")[["pres", "gov", "sen", "ltgov", "ag"]]
+        .sum()
+        .replace(0.0, pd.np.nan)
+    )
+    df = df.merge(egr, how="left", left_on="county_fips", right_on="FIPS")
+    df["pres"] = df["per_dem"].copy()
 
 app.layout = html.Div(
     [
@@ -70,9 +83,7 @@ app.layout = html.Div(
                 ),
                 dcc.Graph(
                     id="bubble_chart",
-                    figure=make_bubble_chart_fig(
-                        df, "2022", "CAP Local/All", "Dem % 2020"
-                    ),
+                    figure=make_bubble_chart_fig(df, "2022", "CAP Local/All", "pres"),
                 ),
                 html.P(
                     "The table below can be filtered using the filter row, and some columns can be toggled on or off.",
@@ -100,7 +111,7 @@ app.layout = html.Div(
             ]
         ),
     ],
-    style={"padding": "20px", "margin-bottom": "25px"},
+    style={"padding": "30px", "margin-bottom": "25px"},
 )
 
 
@@ -125,10 +136,12 @@ def print_explain_mult_value(value):
         return "If multiple items are selected, the values of the relevant axes are scaled using the number of standard deviations away from the mean each county is for that axis item. Then the scores for each county are added together and set at a minimum of zero."
 
 
-@app.callback(Output("explain-x-axis", "children"), [Input("xaxis-column", "value")])
+@app.callback(
+    Output("explain-x-axis", "children"), [Input("xaxis-checkboxes", "value")]
+)
 def print_explain_mult_value_xaxis(value):
-    if isinstance(value, list):
-        return "If multiple years are selected, the X-axis shows the average Democratic performance for a county"
+    if len(value) > 1:
+        return "If multiple races are selected, the X-axis shows the average Democratic performance for a county across the selected races."
     else:
         return ""
 
@@ -161,7 +174,7 @@ def count_geography(year, state):
         Input("year_dropdown", "value"),
         Input("state_dropdown", "value"),
         Input("yaxis-column", "value"),
-        Input("xaxis-column", "value"),
+        Input("xaxis-checkboxes", "value"),
     ],
 )
 def update_bubble_chart(year, state, yaxis, xaxis):
@@ -178,21 +191,31 @@ def update_bubble_chart(year, state, yaxis, xaxis):
     df2 = df[df.State.isin(state)]
     if isinstance(yaxis, list):
         if len(yaxis) == 0:
-            fig = make_bubble_chart_fig(df2, year, yaxis)
+            yaxis = "CAP Local/All"
+            fig = make_bubble_chart_fig(df2, year, yaxis, xaxis)
             fig.update_layout(title="No axis selected")
         elif len(yaxis) == 1:
             fig = make_bubble_chart_fig(df2, year, yaxis, xaxis)
-            fig.update_layout(title=f"{yaxis[0]} vs. Dem 2020 Performance")
+            fig.update_layout(title=f"{yaxis[0]} vs. Democratic Performance")
+            if yaxis[0] not in ["Total Nonwhite %", "CAP Local/All"]:
+                fig.update_layout(
+                    yaxis=dict(showgrid=False, tickformat=",.0f"),
+                )
         else:
             df3 = create_combined_metrics(df2, *yaxis)
-            fig = make_bubble_chart_fig(df3, year, "combined_metric")
+            fig = make_bubble_chart_fig(df3, year, "combined_metric", xaxis)
             fig.update_layout(
-                title=f"{', '.join(yaxis)} Combined vs. Dem 2020 Performance",
+                title=f"{', '.join(yaxis)} Combined vs. Dem Performance",
                 yaxis_title="Combined Metric Score",
+                yaxis=dict(showgrid=False, tickformat=",.1f"),
             )
     else:
         fig = make_bubble_chart_fig(df2, year, yaxis, xaxis)
-        fig.update_layout(title=f"{yaxis} vs. Dem 2020 Performance")
+        fig.update_layout(title=f"{yaxis} vs. Dem Performance")
+        if yaxis not in ["Total Nonwhite %", "CAP Local/All"]:
+            fig.update_layout(
+                yaxis=dict(showgrid=False, tickformat=",.0f"),
+            )
     return fig
 
 
@@ -206,15 +229,6 @@ def update_state_dropdown_on_year_select(year):
 @app.callback(Output("state_dropdown", "value"), [Input("state_dropdown", "options")])
 def reset_states_to_nationwide_on_year_switch(options):
     return "Nationwide"
-
-
-@app.callback(Output("xaxis-checkboxes", "options"), [Input("xaxis-column", "value")])
-def change_checkbox_options_on_year_switch(value):
-
-    options = XDiv.checkbox_options
-    if value == "per_dem":
-
-        return options
 
 
 @app.callback(

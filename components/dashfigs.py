@@ -10,8 +10,8 @@ import pandas as pd
 import numpy as np
 
 
-# df = pd.read_pickle("data/merged_data.pkl")
-e18 = pd.read_pickle("data/elections_2018/attempt_3.pkl")
+df = pd.read_pickle("data/merged_data_sheriffs.pkl")
+e18 = pd.read_pickle("data/elections_2018/attempt_4.pkl")
 
 
 def yaxis_cols():
@@ -54,6 +54,7 @@ def set_table_style_cell_conditional():
         }
         for c in [
             "per_dem",
+            "sen",
             "CAP Local/All",
             "Detainers Total",
             "Deaths_per_thousand_pop",
@@ -73,19 +74,26 @@ party_colors = dict(
 def make_bubble_chart_fig(df, year, yaxis, xaxis):
     df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     df = df[df[f"has_election_{year}"]]
-    df["Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
+    df.loc[:, "Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
+    if isinstance(xaxis, list):
+        df["xaxis"] = df[xaxis].mean(axis=1)
+    elif isinstance(xaxis, str):
+        df["xaxis"] = df[xaxis]
+    else:
+        df["xaxis"] = df["per_dem"]
+
     fig = px.scatter(
         df,
-        x="per_dem",
+        x="xaxis",
         y=yaxis,
         size="votesize",
         color="Party Roll Up",
         color_discrete_map=party_colors,
-        hover_name="Electoral District",
+        hover_name="county_name",
         hover_data=OrderedDict(
             {
                 "State": True,
-                "per_dem": ":.2%",
+                "xaxis": ":.2%",
                 "CAP Local/All": ":0.2f",
                 "votesize": False,
                 "total_votes": ":,f",
@@ -94,7 +102,7 @@ def make_bubble_chart_fig(df, year, yaxis, xaxis):
             }
         ),
         labels={
-            "per_dem": "Dem % 2020",
+            "xaxis": "Democratic % for selected races",
             "total_votes": "2020 Total Votes",
             "Official Name": "Sheriff Name",
             "Party Roll Up": "Sheriff Party",
@@ -106,7 +114,7 @@ def make_bubble_chart_fig(df, year, yaxis, xaxis):
             "plot_bgcolor": "rgba(245,245,245)",
             "paper_bgcolor": "rgba(245,245,245)",
             "xaxis": {"showgrid": False, "tickformat": ",.0%"},
-            "yaxis": {"showgrid": False},
+            "yaxis": {"showgrid": False, "tickformat": ",.0%"},
         },
     )
     return fig
@@ -133,7 +141,13 @@ def make_table_columns(df):
         {"id": "Party Roll Up", "name": "Party", "type": "text"},
         {
             "id": "per_dem",
-            "name": "% Dem",
+            "name": "'20 Pres % Dem",
+            "type": "numeric",
+            "format": FormatTemplate.percentage(2),
+        },
+        {
+            "id": "sen",
+            "name": "'18 Sen % Dem",
             "type": "numeric",
             "format": FormatTemplate.percentage(2),
         },
