@@ -6,27 +6,27 @@ from .dashfigs import yaxis_cols, xaxis_cols
 class XDiv:
     checkbox_options = [
         {
-            "label": "President",
+            "label": "2020 President",
             "value": "pres",
-            "disabled": True,
+            "disabled": False,
         },
         {
-            "label": "US Senate",
+            "label": "2018 US Senate",
             "value": "sen",
             "disabled": False,
         },
         {
-            "label": "Governor",
+            "label": "2018 Governor",
             "value": "gov",
             "disabled": False,
         },
         {
-            "label": "Lt. Governor",
+            "label": "2018 Lt. Governor",
             "value": "ltgov",
             "disabled": False,
         },
         {
-            "label": "Attorney General",
+            "label": "2018 Attorney General",
             "value": "ag",
             "disabled": False,
         },
@@ -38,24 +38,6 @@ class XDiv:
                 html.P(
                     "Select x-axis",
                     style={"font-weight": "bold", "font-size": 16},
-                ),
-                dcc.RadioItems(
-                    id="xaxis-column",
-                    options=xaxis_cols(),
-                    value="per_dem",
-                    labelStyle={
-                        "display": "inline-block",
-                        "font-style": "bold",
-                    },
-                    style={
-                        "padding": "5px 20px",
-                        "max-width": "250px",
-                        "display": "flex",
-                        "justify-content": "space-between",
-                    },
-                    # placeholder="Dem % 2020",
-                    # multi=True,
-                    # style=dict(width="600px"),
                 ),
                 dcc.Checklist(
                     id="xaxis-checkboxes",
