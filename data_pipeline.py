@@ -154,23 +154,9 @@ def jails_data():
     df = pd.read_csv("../data/reuters/all_jails.csv", encoding="cp1252", dtype=rdtypes)
     df["fips"] = df["fips"].str.pad(5, fillchar="0")
     # sum the deaths from 2016-2019
-    df[["d2016", "d2017", "d2018", "d2019",]] = df[
-        [
-            "d2016",
-            "d2017",
-            "d2018",
-            "d2019",
-        ]
-    ].fillna(0)
-    df[["adp2016", "adp2017", "adp2018", "adp2019",]] = df[
-        [
-            "adp2016",
-            "adp2017",
-            "adp2018",
-            "adp2019",
-        ]
-    ].fillna(0)
-    # inplace=True doesn't work here, which isn't great
+    df.groupby(["fips", "statecode", "state", "county"])[
+        ["d2016", "d2017", "d2018", "d2019", "adp2016", "adp2017", "adp2018", "adp2019"]
+    ].sum().reset_index()
     df["d1619"] = df.apply(lambda x: x.d2016 + x.d2017 + x.d2018 + x.d2019, axis=1)
     df["total_adp1619"] = df.apply(
         lambda x: x.adp2016 + x.adp2017 + x.adp2018 + x.adp2019, axis=1
@@ -450,11 +436,13 @@ def merge_data():
 
     # limit to just 2016 or later and only county facilities
     md = md[(md.Year >= 2016) & (md["Facility Type"] == "County Facility")]
+    md["county_lower"] = md.County.str.lower()
+    df["county_lower"] = df.county_name.str.lower()
     md["Detainers Total"] = md.County.map(md.groupby("County")["Total"].sum().to_dict())
     df = df.merge(
-        md[["State", "County", "Detainers Total"]],
-        left_on=["state_name", "county_name"],
-        right_on=["State", "County"],
+        md[["State", "county_lower", "Detainers Total"]],
+        left_on=["state_name", "county_lower"],
+        right_on=["State", "county_lower"],
     )
     # money column: cap local / total detainers
     df["CAP Local/Detainers"] = df["CAPLocal_1619"] / df["Detainers Total"]
@@ -488,7 +476,6 @@ def merge_data():
         gnsd.set_index("fips")["low_level_per_arrest"].to_dict()
     )
 
-    df.drop(["County_x", "County_y"], axis=1, inplace=True)
     return df.drop_duplicates()
 
 
@@ -496,7 +483,81 @@ def wholeads_data(group: str = "electeds"):
     url = "https://wholeads.us/wp-content/uploads/2020/06/Sheriffs-Report-Data.xlsx"
 
     def get_electeds():
-        electeds = pd.read_excel(url, sheet_name="Electeds Raw")
+        who = pd.read_excel(url, sheet_name="Electeds Raw")
+        # Weirdly no Clark County, NV in wholeadsus data :(
+        clark_co = {
+            "State": "NV",
+            "Electoral District": "Clark County",
+            "Urban/Rural": "Urban",
+            "Office Name": "Sheriff",
+            "Official Party": "Republican Party",
+            "Party Roll Up": "Republican Party",
+            "White/Non-White": "White",
+            "Race": "White",
+            "Gender": "Male",
+            "Native %": 0.007,
+            "White %": 0.609,
+            "Black %": 0.105,
+            "Hispanic %": 0.291,
+            "% Asian": 0.087,
+            "Multi %": 0.051,
+            "Other %": 0.135,
+            "Total Nonwhite %": 0.391,
+            "Total": 1.0,
+        }
+        who = who.append(clark_co, ignore_index=True)
+        who["mult_jurisdictions"] = who["Electoral District"].str.split(" & ")
+        who["num_jurisdictions"] = who.mult_jurisdictions.apply(lambda x: len(x))
+        who["adj_county"] = who["Electoral District"].copy()
+        who["adj_county"] = who.loc[:, "adj_county"].apply(
+            lambda x: x + " County"
+            if "county" not in x.lower()
+            and "parish" not in x.lower()
+            and "city" not in x.lower()
+            else x
+        )
+
+        # Came across a couple of weird ones in NY and PA that have "Democratic/Republican"
+        # These are all hand-labeled
+        who.loc[
+            who[who.RDIndex2019.isin(["EOrd22547", "EOrd22560"])].index,
+            "Official Party",
+        ] = "Democratic"
+        who.loc[
+            who[
+                who.RDIndex2019.isin(
+                    [
+                        "EOrd22575",
+                        "EOrd20770",
+                        "EOrd22589",
+                        "EOrd22590",
+                        "EOrd22600",
+                        "EOrd22608",
+                    ]
+                )
+            ].index,
+            "Official Party",
+        ] = "Republican"
+        who.loc[
+            who[who["Official Party"] == "Democratic"].index, "Party Roll Up"
+        ] = "Democratic Party"
+        who.loc[
+            who[who["Official Party"] == "Republican"].index, "Party Roll Up"
+        ] = "Republican Party"
+        # Need to rename "Independent" to "Nonpartisan" where it is "Nonpartisan" in official party
+        who.loc[
+            who[who["Party Roll Up"] == "Independent"].index, "Party Roll Up"
+        ] = "Nonpartisan"
+        # duplicates the multi-jurisdictions
+        mdf = who.loc[np.repeat(who.index.values, who.num_jurisdictions.astype(int))][
+            who.num_jurisdictions > 1
+        ]
+        s = mdf.mult_jurisdictions.values.tolist()
+        l = list(flatten(s))
+        mdf.adj_county = sorted(set(l), key=l.index)
+        electeds = pd.concat([who.drop(who[who.num_jurisdictions > 1].index), mdf])
+        # electeds["county_lower"] = electeds.adj_county.str.lower()
+
         return electeds
 
     def get_candidates():
@@ -535,9 +596,12 @@ def wholeads_data(group: str = "electeds"):
 
 
 if __name__ == "__main__":
+    md = merge_data()
+    md.to_pickle("../data/processed_data/merge_data.pkl")
     who = wholeads_data("electeds")
     merge_data().merge(
         who.rename({"State": "statecode"}, axis=1).drop("Total", axis=1),
+        how="left",
         left_on=["statecode", "county_name"],
-        right_on=["statecode", "Electoral District"],
-    ).drop_duplicates().to_pickle(os.path.join(dir_path, "data", "merged_data.pkl"))
+        right_on=["statecode", "adj_county"],
+    ).to_pickle("../data/merged_data_sheriffs.pkl")

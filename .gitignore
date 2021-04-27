@@ -1,0 +1,9 @@
+__pycache__/
+geckodriver.*
+data/
+notebooks/
+.DS_Store
+.vscode/
+
+findings/
+TODO.md
