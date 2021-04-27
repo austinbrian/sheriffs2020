@@ -64,7 +64,7 @@ def set_table_style_cell_conditional():
 
 party_colors = dict(
     zip(
-        ["Independent", "Unknown", "Democratic Party", "Republican Party"],
+        ["Nonpartisan", "Unknown", "Democratic Party", "Republican Party"],
         ["green", "gray", "blue", "red"],
     )
 )
