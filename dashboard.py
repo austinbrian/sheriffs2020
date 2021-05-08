@@ -29,7 +29,7 @@ with open("data/merged_data_sheriffs.pkl", "rb") as fh:
     df = pickle.load(fh)
 
 
-with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
+with open("data/elections_2018/attempt_5.pkl", "rb") as fh:
     e18 = pickle.load(fh).reset_index(drop=True)
     e18["pres"] = e18.FIPS.map(df.set_index("county_fips")["per_dem"].to_dict())
     e18["gov"] = e18.loc[e18[e18.office == "Governor"].index, "Dem%"]
@@ -40,13 +40,17 @@ with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
         e18[e18.office.str.contains("house of representatives", case=False)].index,
         "Dem%",
     ]
-    egr = (
-        e18[["FIPS", "pres", "gov", "sen", "ltgov", "ag", "ushouse"]]
-        .groupby("FIPS")[["pres", "gov", "sen", "ltgov", "ag", "ushouse"]]
-        .sum()
-        .replace(0.0, np.nan)
-    )
+    offices = ["pres", "gov", "sen", "ltgov", "ag", "ushouse"]
+
+    egr = e18[["FIPS"] + offices].groupby("FIPS")[offices].sum().replace(0.0, np.nan)
     df = df.merge(egr, how="left", left_on="county_fips", right_on="FIPS")
+
+    def get_list_of_offices(vals):
+        assert len(vals) == len(offices)
+        return [offices[i] for i in range(len(offices)) if vals[i] > 0]
+
+    df["offices"] = df[offices].apply(get_list_of_offices, axis=1)
+
     df["pres"] = df["per_dem"].copy()
 
 app.layout = html.Div(
@@ -147,9 +151,49 @@ def print_explain_mult_value(value):
 )
 def print_explain_mult_value_xaxis(value):
     if len(value) > 1:
-        return "If multiple races are selected, the X-axis shows the average Democratic performance for a county across the selected races."
+        return "If multiple races are selected, the X-axis shows the average Democratic performance for a county across the selected races.\nNot all races are available for every county."
     else:
         return ""
+
+
+@app.callback(
+    Output("xaxis-checkboxes", "options"),
+    [Input("year_dropdown", "value"), Input("state_dropdown", "value")],
+)
+def available_checkboxes_for_geographies_with_elections(year, state):
+    if state == "Nationwide":
+        state = df[df[f"has_election_{year}"]].State.unique()
+    else:
+        if isinstance(state, list):
+            if len(state) > 0:
+                state = state
+            else:
+                state = df[df[f"has_election_{year}"]].State.unique()
+        else:
+            state = [state]
+    df2 = df[(df.State.isin(state)) & (df[f"has_election_{year}"])]
+    offices = df2.explode("offices")["offices"].unique()
+    return XDiv.update_checkbox_items(*offices)
+
+
+@app.callback(
+    Output("xaxis-checkboxes", "value"),
+    [Input("year_dropdown", "value"), Input("state_dropdown", "value")],
+)
+def values_of_checkboxes_for_geographies_with_elections(year, state):
+    if state == "Nationwide":
+        state = df[df[f"has_election_{year}"]].State.unique()
+    else:
+        if isinstance(state, list):
+            if len(state) > 0:
+                state = state
+            else:
+                state = df[df[f"has_election_{year}"]].State.unique()
+        else:
+            state = [state]
+    df2 = df[(df.State.isin(state)) & (df[f"has_election_{year}"])]
+    offices = df2.explode("offices")["offices"].dropna().unique()
+    return offices
 
 
 @app.callback(

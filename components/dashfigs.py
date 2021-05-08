@@ -72,13 +72,13 @@ party_colors = dict(
 
 
 def make_bubble_chart_fig(df, year, yaxis, xaxis):
-    df["votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
+    df.loc[:, "votesize"] = df["total_votes"].apply(lambda x: x ** (1 / 2))
     df = df[df[f"has_election_{year}"]]
     df.loc[:, "Party Roll Up"] = df["Party Roll Up"].fillna("Unknown")
     if isinstance(xaxis, list):
         df["xaxis"] = df[xaxis].mean(axis=1)
     elif isinstance(xaxis, str):
-        df["xaxis"] = df[xaxis]
+        df.loc[:, "xaxis"] = df[xaxis]
     else:
         df["xaxis"] = df["per_dem"]
 

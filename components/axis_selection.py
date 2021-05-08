@@ -37,6 +37,51 @@ class XDiv:
         },
     ]
 
+    @staticmethod
+    def create_office_name_to_short_name_dict():
+        sens = {i: "sen" for i in ["us senator", "senate", "us senate", "us sen"]}
+        govs = {i: "gov" for i in ["gov", "governor", "gubernatorial"]}
+        ltgovs = {i: "ltgov" for i in ["lt gov", "lt governor", "lieutenant governor"]}
+        ags = {i: "ag" for i in ["attorney general", "ag"]}
+        reps = {
+            i: "ushouse" for i in ["us house", "house", "us house of representatives"]
+        }
+        off_dict = dict(**sens, **govs, **ags, **reps, **ltgovs)
+        return off_dict
+
+    @staticmethod
+    def convert_office_names_to_short_name_list(cls, *names):
+        if names:
+            off_dict = cls.create_office_name_to_short_name_dict()
+            cln_names = [i.lower().replace(".", "") for i in names]
+            return list(
+                filter(lambda x: x is not None, [off_dict.get(i) for i in cln_names])
+            )
+        else:
+            return
+
+    @classmethod
+    def update_checkbox_items(cls, *offices):
+        """expects offices in short format e.g., sen, house, ltgov"""
+        chops = []
+        for i in cls.checkbox_options:
+            # for the moment, the 2020 presidential should always be enabled
+            if i["value"] == "pres":
+                i["disabled"] = False
+                chops.append(i)
+            elif i["value"] in offices:
+                i["disabled"] = False
+                chops.append(i)
+            else:
+                i["disabled"] = True
+                chops.append(i)
+
+        return chops
+
+    @classmethod
+    def update_checkbox_values(cls, *offices):
+        return cls.convert_office_names_to_short_name_list(offices)
+
     def __new__(cls):
         return html.Div(
             children=[
