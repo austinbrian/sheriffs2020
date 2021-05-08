@@ -12,6 +12,55 @@ def get_state_df(state, jurisdiction="precinct"):
     return stdf
 
 
+def normalize_office_names(df):
+    df = df.copy()
+    df.loc[
+        df.office.str.lower().isin(["governor", "gubernatorial", "gov"]), "office"
+    ] = "Governor"
+    df.loc[
+        df.office.str.lower()
+        .replace(".", "")
+        .isin(
+            [
+                "house",
+                "u.s. house",
+                "us house",
+                "us house of representatives",
+            ]
+        ),
+        "office",
+    ] = "U.S. House of Representatives"
+    df.loc[
+        df.office.str.lower().replace(".", "").isin(["attorney general", "ag"]),
+        "office",
+    ] = "Attorney General"
+    df.loc[
+        df.office.str.lower()
+        .replace(".", "")
+        .isin(
+            [
+                "lieutenant governor",
+                "lt governor",
+                "lt gov",
+            ]
+        ),
+        "office",
+    ] = "Attorney General"
+    df.loc[
+        df.office.str.lower()
+        .replace(".", "")
+        .isin(
+            [
+                "senate",
+                "senator",
+                "us senate",
+            ]
+        ),
+        "office",
+    ] = "U.S. Senate"
+    return df
+
+
 def process_party_names(stdf):
     xf = (
         stdf.groupby(["county", "office", "party"])["votes"]
@@ -84,6 +133,13 @@ def calc_perf_2018(n=3):
     md = pd.read_pickle("data/processed_data/merge_data.pkl")
     states_22 = states_22 = md[md.has_election_2022].ST.dropna().unique()
     print("Need to create df for states:", states_22)
+    offices = [
+        "U.S. SENATE",
+        "GOVERNOR",
+        "LIEUTENANT GOVERNOR",
+        "ATTORNEY GENERAL",
+        "U.S. HOUSE OF REPRESENTATIVES",
+    ]
     counties = county_populations()[
         ["STNAME", "ST", "CTYNAME", "FIPS", "POPESTIMATE2019"]
     ]
@@ -92,13 +148,17 @@ def calc_perf_2018(n=3):
     )
     counties["lower_county"] = counties.simple_county.str.lower()
     for state in states_22[:n]:
-        if state in ["NH", "NV", "NC"]:
+        if state in ["NH", "NV", "NC", "WI"]:
             if state == "NH":
                 xf = new_hampshire_18()
             elif state == "NV":
                 xf = nevada_18()
             elif state == "NC":
                 xf = north_carolina_18()
+            elif state == "WI":
+                xf = wisconsin_18()
+            xf = normalize_office_names(xf)
+            xf = xf[xf.office.str.upper().isin(offices)]
             xf["lower_county"] = xf.county.str.lower()
             df = counties[counties.ST == state].copy()
             df = df.merge(xf, on="lower_county", how="left")
@@ -107,9 +167,11 @@ def calc_perf_2018(n=3):
             continue
         try:
             stdf = get_state_df(state, "county")
+            stdf = normalize_office_names(stdf)
         except:
             try:
                 stdf = get_state_df(state, "precinct")
+                stdf = normalize_office_names(stdf)
                 stdf.dropna(subset=["county", "office", "votes"], inplace=True)
             except:
                 print(f"No data found for {state}")
@@ -137,19 +199,7 @@ def calc_perf_2018(n=3):
         df["rec_ballots_18"] = df["simple_county"].map(ballots_dict)
 
         # other stuff
-        stdf = stdf[
-            stdf.office.str.upper().isin(
-                [
-                    "U.S. SENATE",
-                    "GOVERNOR",
-                    "LIEUTENANT GOVERNOR",
-                    "ATTORNEY GENERAL",
-                    "U.S. HOUSE",
-                    "U.S. HOUSE OF REPRESENTATIVES",
-                    "US HOUSE OF REPRESENTATIVES",
-                ]
-            )
-        ]
+        stdf = stdf[stdf.office.str.upper().isin(offices)]
         xf = process_party_names(stdf)
         xf["state"] = state
 
@@ -213,9 +263,18 @@ def north_carolina_18():
     return ncg
 
 
+def wisconsin_18():
+    wi_data_url = "https://github.com/openelections/openelections-data-wi/blob/master/2018/20181106__wi__general__ward.csv?raw=true"
+    wi = pd.read_csv(wi_data_url)
+    wi = normalize_office_names(wi)
+    wig = process_party_names(wi)
+    wig["state"] = "WI"
+    return wig
+
+
 if __name__ == "__main__":
     xf = calc_perf_2018(n=100)
-    xf.to_pickle("data/elections_2018/attempt_4.pkl")
+    xf.to_pickle("data/elections_2018/attempt_5.pkl")
     # nh = new_hampshire_18()
     # nv = nevada_18()
     # pd.concat([xf, nh, nv]).to_pickle("data/elections_2018/attempt_2.pkl")

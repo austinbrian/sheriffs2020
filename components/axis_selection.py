@@ -30,6 +30,11 @@ class XDiv:
             "value": "ag",
             "disabled": False,
         },
+        {
+            "label": "2018 US House",
+            "value": "ushouse",
+            "disabled": False,
+        },
     ]
 
     def __new__(cls):
@@ -44,7 +49,7 @@ class XDiv:
                         dcc.Checklist(
                             id="xaxis-checkboxes",
                             options=cls.checkbox_options,
-                            value=["pres", "sen", "gov", "ltgov", "ag"],
+                            value=["pres", "sen", "gov", "ltgov", "ag", "ushouse"],
                             # labelStyle={"display": "flex"},
                             style={
                                 "padding": "5px",
