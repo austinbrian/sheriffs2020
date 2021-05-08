@@ -28,6 +28,7 @@ app.title = "Sheriffs for Trusting Communities"
 with open("data/merged_data_sheriffs.pkl", "rb") as fh:
     df = pickle.load(fh)
 
+
 with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
     e18 = pickle.load(fh).reset_index(drop=True)
     e18["pres"] = e18.FIPS.map(df.set_index("county_fips")["per_dem"].to_dict())
@@ -35,9 +36,13 @@ with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
     e18["sen"] = e18.loc[e18[e18.office == "U.S. Senate"].index, "Dem%"]
     e18["ltgov"] = e18.loc[e18[e18.office == "Lieutenant Governor"].index, "Dem%"]
     e18["ag"] = e18.loc[e18[e18.office.str.lower() == "attorney general"].index, "Dem%"]
+    e18["ushouse"] = e18.loc[
+        e18[e18.office.str.contains("house of representatives", case=False)].index,
+        "Dem%",
+    ]
     egr = (
-        e18[["FIPS", "pres", "gov", "sen", "ltgov", "ag"]]
-        .groupby("FIPS")[["pres", "gov", "sen", "ltgov", "ag"]]
+        e18[["FIPS", "pres", "gov", "sen", "ltgov", "ag", "ushouse"]]
+        .groupby("FIPS")[["pres", "gov", "sen", "ltgov", "ag", "ushouse"]]
         .sum()
         .replace(0.0, np.nan)
     )
