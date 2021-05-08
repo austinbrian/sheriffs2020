@@ -3,6 +3,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import pickle5 as pickle
 from dash.dependencies import Input, Output, State
@@ -38,7 +39,7 @@ with open("data/elections_2018/attempt_4.pkl", "rb") as fh:
         e18[["FIPS", "pres", "gov", "sen", "ltgov", "ag"]]
         .groupby("FIPS")[["pres", "gov", "sen", "ltgov", "ag"]]
         .sum()
-        .replace(0.0, pd.np.nan)
+        .replace(0.0, np.nan)
     )
     df = df.merge(egr, how="left", left_on="county_fips", right_on="FIPS")
     df["pres"] = df["per_dem"].copy()
